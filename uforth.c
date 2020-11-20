@@ -89,8 +89,8 @@ _TWIG: // run opcodes
         case NOOP : goto _TWIG; // does nop
         case THIS : goto _THIS; // push a value from ram to parameter stack, constant
         case THAT : goto _THAT; // push a address of a value in ram to parameter stack, variable 
-        case CODE : goto _CODE; // runs bytecodes
-        case LIST : goto _LIST; // runs 
+        case TWIG : w = rom[ip++]; goto _NEST; // runs lists of address
+        case LEAF : goto _CODE; // runs bytecodes
         default : goto _TWIG;
     }
 
@@ -148,7 +148,7 @@ _JUMP: // branch
  *
  */
 
-_LIST:
+_LIST: zzzzzzz
 
 _NEXT: // w = *ip , ip = *w , goto ???;
     w = rom[ip]; // ??? ITC
@@ -158,7 +158,7 @@ _NEXT: // w = *ip , ip = *w , goto ???;
 _NEST: // docol or :s , push(ip), ip = w, goto NEXT;
     rp--; rp[0] = ip;
     ip = w;  // ???? ITC
-    goto _NEXT;
+    goto _TWIG;
 
 _UNNEST: // dosem or ;s , pull(ip), goto NEXT;
     ip = rp[0]; rp++;
