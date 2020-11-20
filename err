@@ -1,11 +1,14 @@
 uforth.c: In function ‘forth’:
-uforth.c:53:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- rp = (uint16_t *) (ram[RAM_SIZE - 2]);
-      ^
-uforth.c:55:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- sp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
-      ^
+uforth.c:57:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     rp = (uint16_t *) (ram[RAM_SIZE - 2]);
+          ^
+uforth.c:59:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     sp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
+          ^
+uforth.c:229:11: error: expected ‘;’ before ‘~’ token
+     t = t ~ n;
+           ^
 uforth.c: In function ‘forth’:
-uforth.c:165:1: error: expected declaration or statement at end of input
+uforth.c:255:1: error: expected declaration or statement at end of input
  }
  ^
