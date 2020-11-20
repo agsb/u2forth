@@ -40,18 +40,19 @@
 * 
 */ 
 
-#define CELL_SIZE    2 // bytes
-#define RAM_SIZE  1024 // bytes
-#define RAM_OFFSET  64 // bytes
-#define FLASH_SIZE  8192 // bytes
-#define STACK_SIZE    32 // bytes
+#define CELL_SIZE      2  
+#define RAM_SIZE    1024  
+#define RAM_OFFSET    64  
+#define ROM_OFFSET  1024 // ?????  
+#define FLASH_SIZE  8192  
+#define STACK_SIZE    32  
 
 //typedef uint16_t    uint16_t;
 //typedef uint8_t     uint8_t;
 
 uint16_t rom[FLASH_SIZE/CELL_SIZE];
 
-uint16_t  *sp, *rp, ip, up;
+uint16_t  *sp, *rp, *up;
 
 uint16_t  t, n, w;
 
@@ -59,7 +60,7 @@ uint8_t c, *cp, ram[RAM_SIZE];
 
 void forth (void) {
 
-enum opmodes  {     NOOP, MODE, CODE, THIS, POOL, LOOP };
+enum opmodes  {     NOOP, THIS, THAT, CODE, LIST };
 
 enum opcodes  {     NOP, NEXT, NEST, UNNEST, CALL, RETURN, EXIT, 
                     RTP, R2P, P2R, 
@@ -71,29 +72,36 @@ int forth(void) {
 
     ip = 0;
 
-    up = RAM_OFFSET;
+    dp = (uint16_t *) (rom[ROM_OFFSET]);
+    
+    up = (uint16_t *) (ram[RAM_OFFSET]);
 
     rp = (uint16_t *) (ram[RAM_SIZE - 2]);
 
     sp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
 
-TWIG:
+_TWIG: // run opcodes
 
-    switch (rom[ip++]) {
-        case NOOP : goto TWIG;
-        case CODE : goto POOL;
-        case THIS : goto THIS;
-        default : goto TWIG;
+
+    w = rom[ip++];
+    
+    switch (w) {
+        case NOOP : goto _TWIG; // does nop
+        case THIS : goto _THIS; // push a value from ram to parameter stack, constant
+        case THAT : goto _THAT; // push a address of a value in ram to parameter stack, variable 
+        case CODE : goto _CODE; // runs bytecodes
+        case LIST : goto _LIST; // runs 
+        default : goto _TWIG;
     }
 
-POOL:
+_CODE:
 
     cp = (uint8_t *) (rom + ip);
 
-LEAF:    
+_LEAF: // runs bytecodes   
 
     switch (*cp++) {
-        case NOOP : goto LEAF;
+        case NOOP : goto _LEAF;
         case NEXT : ;
         case NEST : ;
         case UNNEST : ;
@@ -107,41 +115,61 @@ LEAF:
         case RTP : ;
         case R2P : ;
         case P2R : ;
-        default : goto LEAF;
+        default : goto _LEAF;
     }
 
 
-    /* sequence of thread codes, must be in this order */
+/* sequence of optimizes thread codes, must be in this order */
+
+/*
+ * code primitives, most using only íp and sp 
+ *
+ */
 
 LOOP:
 
-THIS: // doLIT
-    sp--; sp[0] = rom[ip];
+_THAT: //
+_THIS: //
+    sp--; sp[0] = t;
+    t = rom[ip] << 1; // push the address in ram
+    if ( w == THAT) t = (uint16_t *) ram[t]; // push the value of the address in ram
     ip++;
-    goto TWIG;
+    goto _TWIG;
 
-NEXT: // w = *ip , ip = *w , goto ???;
-    w = rom[ip]; // ??? ITC
-    ip = rom[w];
-    goto TWIG;
+_JUMPNZ: // ?branch
+    if (t != 0) goto _TWIG;
 
-NEST: // docol or :s , push(ip), ip = w, goto NEXT;
-    rp--; rp[0] = ip;
-    ip = w;  // ???? ITC
-    goto NEXT;
-
-UNEST: // dosem or ;s , pull(ip), goto NEXT;
-    ip = rp[0]; rp++;
-    goto NEXT;
-
-JUMPNZ: // ?branch
-
-JUMP: // branch
+_JUMP: // branch
     ip = rom[ip];
-    goto TWIG;    
+    goto _TWIG;    
 
 /*
- * code primitives
+ * code primitives, most using only íp and rp 
+ *
+ */
+
+_LIST:
+
+_NEXT: // w = *ip , ip = *w , goto ???;
+    w = rom[ip]; // ??? ITC
+    ip = rom[w];
+    goto _TWIG;
+
+_NEST: // docol or :s , push(ip), ip = w, goto NEXT;
+    rp--; rp[0] = ip;
+    ip = w;  // ???? ITC
+    goto _NEXT;
+
+_UNNEST: // dosem or ;s , pull(ip), goto NEXT;
+    ip = rp[0]; rp++;
+    goto _NEXT;
+
+NXT: // ???????
+    t = (t == 0) ?
+    goto NEXT;
+
+/*
+ * code primitives, most using only sp and rp 
  *
  */
 
@@ -159,7 +187,6 @@ RTP: // R@
     sp--; sp[0] = t; 
     t = rp[0];
     goto LOOP;
-
 
 PULL:
 DROP: // ( W1 -- )

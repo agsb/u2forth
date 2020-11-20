@@ -1,14 +1,36 @@
 uforth.c: In function ‘forth’:
-uforth.c:57:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+uforth.c:73:5: error: ‘ip’ undeclared (first use in this function)
+     ip = 0;
+     ^
+uforth.c:73:5: note: each undeclared identifier is reported only once for each function it appears in
+uforth.c:75:5: error: ‘dp’ undeclared (first use in this function)
+     dp = (uint16_t *) (rom[ROM_OFFSET]);
+     ^
+uforth.c:77:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     up = (uint16_t *) (ram[RAM_OFFSET]);
+          ^
+uforth.c:79:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
      rp = (uint16_t *) (ram[RAM_SIZE - 2]);
           ^
-uforth.c:59:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+uforth.c:81:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
      sp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
           ^
-uforth.c:229:11: error: expected ‘;’ before ‘~’ token
-     t = t ~ n;
-           ^
+uforth.c:135:25: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     if ( w == THAT) t = (uint16_t *) ram[t]; // push the value of the address in ram
+                         ^
+uforth.c:135:23: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
+     if ( w == THAT) t = (uint16_t *) ram[t]; // push the value of the address in ram
+                       ^
+uforth.c:157:1: error: duplicate label ‘CALL’
+ CALL:
+ ^
+uforth.c:151:1: note: previous definition of ‘CALL’ was here
+ CALL:
+ ^
+uforth.c:93:9: error: label ‘_LIST’ used but not defined
+         case LIST : goto _LIST; // runs 
+         ^
 uforth.c: In function ‘forth’:
-uforth.c:255:1: error: expected declaration or statement at end of input
+uforth.c:335:1: error: expected declaration or statement at end of input
  }
  ^
