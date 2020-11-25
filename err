@@ -1,30 +1,28 @@
-uforth.c: In function ‘forth’:
-uforth.c:73:5: error: ‘ip’ undeclared (first use in this function)
-     ip = 0;
-     ^
-uforth.c:73:5: note: each undeclared identifier is reported only once for each function it appears in
-uforth.c:75:5: error: ‘dp’ undeclared (first use in this function)
-     dp = (uint16_t *) (rom[ROM_OFFSET]);
-     ^
-uforth.c:77:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     up = (uint16_t *) (ram[RAM_OFFSET]);
+u2forth.c: In function ‘forth’:
+u2forth.c:86:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     rsp = (uint16_t *) (ram[RAM_SIZE - 2]);
+           ^
+u2forth.c:88:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
+           ^
+u2forth.c:92:7: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
+     c = (uint8_t *) (rom + ip);
+       ^
+u2forth.c:143:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     t = (uint16_t *) rom[ip];  /*  push the address in ram */
+         ^
+u2forth.c:143:7: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
+     t = (uint16_t *) rom[ip];  /*  push the address in ram */
+       ^
+u2forth.c:151:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     ip = (uint16_t *) rom[ip];
           ^
-uforth.c:79:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     rp = (uint16_t *) (ram[RAM_SIZE - 2]);
-          ^
-uforth.c:81:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     sp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
-          ^
-uforth.c:135:25: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     if ( w == THAT) t = (uint16_t *) ram[t]; // push the value of the address in ram
-                         ^
-uforth.c:135:23: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
-     if ( w == THAT) t = (uint16_t *) ram[t]; // push the value of the address in ram
-                       ^
-uforth.c:169:5: error: expected expression before ‘goto’
-     goto NEXT;
-     ^
-uforth.c: In function ‘forth’:
-uforth.c:338:1: error: expected declaration or statement at end of input
- }
+u2forth.c:151:8: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
+     ip = (uint16_t *) rom[ip];
+        ^
+u2forth.c:160:1: warning: label ‘LEAF’ defined but not used [-Wunused-label]
+ LEAF:  /*  bytecodes    */
+ ^
+u2forth.c:125:1: warning: label ‘TWIG’ defined but not used [-Wunused-label]
+ TWIG:  /* opcodes */
  ^
