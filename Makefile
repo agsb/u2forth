@@ -21,6 +21,7 @@ CC=avr-gcc
 # Flags for compiler
 CC_FLAGS_COMMON= \
 	-c         \
+    -O0		   \
     -W         \
     -Wall      \
     -ansi      \
@@ -49,15 +50,17 @@ $(PROJ_NAME): $(OBJ)
 	@ echo 'Finished building binary: $@'
 	@ echo ' '
 
-.%.o: ./%.s 
-	@ echo 'Building object target using GCC compiler: $<'
-	$(CC) $< $(CC_FLAGS) -o $@
-	@ echo ' '
-
+# Compile: create assembler files from C source files.
 .%.s: ./%.c ./%.h
 	@ echo 'Building assembler target using GCC compiler: $<'
-	$(CC) $< $(CC_FLAGS) -S $@
+	$(CC) -S -fverbose-asm $(ALL_FLAGS) $< -o $@
 	@ echo ' '
+
+.%.o: ./%.s 
+	@ echo 'Building object target using GCC compiler: $<'
+	$(CC) $(ALL_FLAGS) $< -o $@
+	@ echo ' '
+
 
 #objFolder:
 #	@ mkdir -p objects
@@ -66,7 +69,7 @@ $(PROJ_NAME): $(OBJ)
 
 clean:
 	@ echo 'Clearing all objects '
-	@ $(RM) ./*.o ./*.s *~ $(PROJ_NAME)
+	@ $(RM) ./*.o ./*.s *~ 
 
 .PHONY: all clean
 

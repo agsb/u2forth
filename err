@@ -1,7 +1,19 @@
+u2forth.c:150:0: warning: "USART_BAUD" redefined
+ #define USART_BAUD  (((F_CPU/BAUD)/16UL))   /* overwise 52 gives about 0% error for 9600 */
+ ^
+u2forth.c:149:0: note: this is the location of the previous definition
+ #define USART_BAUD  (((F_CPU/BAUD)/16UL)-1) /* official 51 gives about 2% error for 9600*/
+ ^
 u2forth.c: In function ‘main’:
-u2forth.c:121:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+u2forth.c:173:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
      rsp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - CELL]);
            ^
-u2forth.c:123:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+u2forth.c:175:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
      psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - STACK_SIZE - CELL]);
            ^
+u2forth.c:367:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     t = (uint16_t *) ram[t];
+         ^
+u2forth.c:367:7: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
+     t = (uint16_t *) ram[t];
+       ^
