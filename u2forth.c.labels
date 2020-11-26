@@ -1,0 +1,343 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <avr/io.h>
+#include <avr/pgmspace.h>
+
+/*
+ * u2forth
+ *
+ * Alvaro Gomes Sobral Barcellos
+ *
+ * AVR microcontrolers
+ *
+ * using avr-gcc -mmcu=atmega8
+ *
+ * model ATMEGA8
+ * virtual 8 bit cpu with 16 bit address
+ *
+ * u2forth is based in eForth from Dr. Ting
+ *
+ * focus in smaller and smart
+ *
+ * WARNNING: This C code makes abusive use of goto LABEL:
+ * 
+ *
+ *  Copyright © 2020, Alvaro Barcellos, 
+ *  Permission is hereby granted, free of charge, to any person obtaining
+ *  a copy of this software and associated documentation files (the
+ *  "Software"), to deal in the Software without restriction, including
+ *  without limitation the rights to use, copy, modify, merge, publish,
+ *  distribute, sublicense, and/or sell copies of the Software, and to
+ *  permit persons to whom the Software is furnished to do so, subject to
+ *  the following conditions:
+ *  
+ *  The above copyright notice and this permission notice shall be
+ *  included in all copies or substantial portions of the Software.
+ *  
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ *  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ *  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ *  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ *  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * 
+ */ 
+
+#define CELL_SIZE      2  
+#define RAM_SIZE    1024  
+#define RAM_OFFSET    64  
+#define ROM_OFFSET  1024   
+#define FLASH_SIZE  8192  
+#define STACK_SIZE    32  
+
+uint16_t  *psp, *rsp;
+uint16_t  t, n, w;
+uint16_t  ip, up, dp;
+uint8_t c, *cp, ram[RAM_SIZE];
+
+
+const uint16_t rom[1000] PROGMEM = { 
+
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+
+};
+
+int forth(void) {
+
+const void *opmodes[] PROGMEM = { 
+	&&TWIG, &&THIS, &&LIST, &&CODE  
+	};
+
+const void *opcodes[] PROGMEM = {
+	&&NOOP, &&CODE, &&NEXT, &&NEST, &&UNNEST, 
+	&&RTP, &&R2P, &&P2R, 
+	&&DUPNZ, &&DUP, &&DROP, &&SWAP, &&OVER, 
+	&&AND, &&OR, &&XOR, &&INV, &&CPL, 
+	&&SHL, &&SHR, &&LTZ, &&GTZ, &&EQZ
+	};
+
+const void *constantes[] PROGMEM = { 
+ 	&&ZERO, &&ONE, &&TWO, &&SOT, &&EOT, 
+	 &&DEC, &&LF, &&FF, &&HEX, &&CAN, 
+ 	&&ESC, &&BS, &&CR, &&SPC, &&CELL 
+	};
+
+
+
+    ip = 0;
+
+    dp = (uint16_t *) (rom[ROM_OFFSET]);
+    
+    up = (uint16_t *) (ram[RAM_OFFSET]);
+
+    rsp = (uint16_t *) (ram[RAM_SIZE - 2]);
+
+    psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
+
+TWIG:  /*  run opmodes */
+
+LIST:
+
+    w = rom[ip];
+	ip += 1;
+    
+	if ( w < 8 ) { goto *opmodes[w]; }
+ 	else { goto TWIG; } 
+
+/* op mode LIST: */
+
+THIS:  /*  */
+    psp--; psp[0] = t;
+    t = rom[ip] ;  /*  push the address in ram */
+    ip++;
+    goto TWIG;
+
+NEXT:  /*  w = *ip, ip = *w , goto ???; */
+    w = rom[ip];  /*  ??? ITC */
+    ip = rom[w];
+    goto TWIG;
+
+NEST: /*  docol or :s , push(ip), ip = w, goto NEXT; */
+    rsp--; rsp[0] = ip;
+    ip = w;   /*  ???? ITC */
+    goto NEXT;
+
+UNNEST: /*  dosem or ;s , pull(ip), goto NEXT; */
+    ip = rsp[0]; rsp++;
+    goto NEXT;
+
+JUMPNZ:  /*  ?branch */
+    if (t != 0) goto TWIG;
+
+JUMP:  /*  branch */
+    ip = rom[ip];
+    goto TWIG;    
+
+LEAF:  /*  runs bytecodes    */
+
+    c = (uint8_t *) (rom + ip);
+
+CODE:
+
+	/* ??? next ip ? */
+
+	if ( c < 32 ) { goto *opcodes[c]; }
+ 	else { goto LEAF; } 
+
+NOOP: 
+	goto CODE;
+
+P2R:  /*  >R */
+    rsp--; rsp[0] = t;
+    t = psp[0]; psp++;
+    goto CODE;
+
+R2P:  /*  R> */
+    psp--; psp[0] = t;
+    t = rsp[0]; rsp++;
+    goto CODE;
+
+RTP:  /*  R@ */
+    psp--; psp[0] = t; 
+    t = rsp[0];
+    goto CODE;
+
+/*PULL: */
+DROP:  /*  ( W1 -- ) */
+    t = psp[0]; psp++;
+    goto CODE;
+
+DUPNZ:  /*  ( w1 -- 0 | w1 w1 ) */
+    if (n != 0) psp--; psp[0] = t;
+    goto CODE;
+
+/* PUSH: */
+DUP:  /*  ( w1 -- w1 w1 ) */
+    psp--; psp[0] = t;
+    goto CODE;
+
+OVER:  /*  ( w1 w2 -- w1 w2 w1 ) */
+    n = psp[0]; 
+    psp--; psp[0] = t;
+    t = n;
+    goto CODE;
+
+SWAP:  /*  ( w1 w2 -- w2 w1 ) */
+    n = t;
+    t = psp[0];
+    psp[0] = n;
+    goto CODE;
+
+AND:  /*  logical and */
+    n = psp[0]; psp++;
+    t = t & n;
+    goto CODE;
+
+OR:  /*  logical or  */
+    n = psp[0]; psp++;
+    t = t | n;
+    goto CODE;
+
+XOR:  /*  logical xor */
+    n = psp[0]; psp++;
+    t = t ^ n;
+    goto CODE;
+
+INV:  /*  invert bits */
+    n = psp[0]; psp++;
+    t = ~ t;
+    goto CODE;
+
+CPL:  /*  two complement */
+    n = psp[0]; psp++;
+    t = ~ t + 1;
+    goto CODE;
+
+SHL:  /*  shift left, multiply by 2 */
+    n = psp[0]; psp++;
+    t = t << n;
+    goto CODE;
+
+SHR:  /*  shift right, divide by 2 */
+    n = psp[0]; psp++;
+    t = t >> n;
+    goto CODE;
+
+LTZ:  /*  less than zero */
+    t = ( t < 0 ) ? -1 : 0;
+    goto CODE;
+
+GTZ:  /*  greater than zero */
+    t = ( t > 0 ) ? -1 : 0;
+    goto CODE;
+
+EQZ:  /*  equal zero */
+    t = ( t == 0 ) ? -1 : 0;
+    goto CODE;
+
+EXIT:
+    goto EXIT;
+
+/*
+ *
+ * push a constant to parameter stack 
+ *
+ */
+
+	if ( w < 16 ) { goto *constantes[c]; }
+ 	else { goto TWIG; } 
+
+CTES:
+    psp--; psp[0] = t;
+    t = n;
+    goto CODE;
+
+ZERO:  /*  ASCII null */
+    n = 0x00;
+    goto CTES;
+
+ONE:
+    n = 0x01;
+    goto CTES;
+
+TWO:
+SOT:  /*  ASCII Start of text */
+    n = 0x02;
+    goto CTES;
+
+EOT:  /*  ASCII end of text */
+    n = 0x03;
+    goto CTES;
+
+DEC:
+LF:  /*  ASCII line feed */
+    n = 0x0A;
+    goto CTES;
+
+FF:  /*  ASCII form feed */
+    n = 0x0C;
+    goto CTES;
+
+HEX:  /*  ASCII form feed */
+    n = 0x10;
+    goto CTES;
+
+CAN:  /*  ASCII cancel */
+    n = 0x18;
+    goto CTES;
+
+ESC:  /*  ASCII escape */
+    n = 0x1B;
+    goto CTES;
+
+BS:  /*  ASCII backspace */
+    n = 0x08;
+    goto CTES;
+
+CR:  /*  ASCII cariage return */
+    n = 0x0D;
+    goto CTES;
+
+SPC:  /*  ASCII space vi  */
+    n = 0x20;
+    goto CTES;
+
+CELL:  /*  size of CELL, 2 bytes */
+    n = 0x02;
+    goto CTES;
+
+
+/* NEVER HERE LAND */
+
+    return (1);
+
+    }
+
+int main ( int argc, char * argv[] ) {
+
+    return (forth());
+
+}
+
+

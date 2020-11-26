@@ -1,0 +1,142 @@
+ atmega8
+
+1. referencias
+
+	http://www2.ene.unb.br/gaborges/disciplinas/psem/desenvolvimentoATmega8.pdf
+
+	https://muforth.nimblemachines.com/threaded-code/
+
+2. memoria
+ 	0x000 a 0x01f  registers
+ 	0x020 a 0x03f  io ports
+ 	0x040 a 0x05f  registers for eeprom
+ 	0x060 a 0x45f	 sram  1k x 8bit
+
+ 	0x000 a 0xfff  flash 4k x 16bit
+
+ 	0x000 a 0x1ff	 eeprom 512 x 8bit
+
+3. interrupções
+
+ 	interrupt vector list
+
+	0x000	reset jmp address
+	0x001	int0
+	0x002	int1
+	...
+	0x008	timer1 overflow
+	...
+	0x012		
+
+4. check list:
+
+	watch dog disabled.
+
+	brown out enabled.
+
+	clock internal 8 Mhz CKSEL 0100
+
+	clock internal tuned OSCCAL 
+
+	usart at 9600
+	SP reserved for interrupts
+
+5. eforth minimal as u2forth
+
+Indirect Thread Code:
+
+next:
+   *ip++ -> w
+   jump **w++
+
+enter:
+docolon:
+nest:
+   ip -> *rp++
+   w -> ip
+   jump next
+
+exit:
+unnest:
+   *--rp -> ip
+   jump next
+
+In a DTC system, a cfa points to a code field, which contains machine code.
+
+In an ITC system, a cfa points to a code field, which points to machine code.
+
+Direct Thread Code:
+
+  NEXT:    Fetch the address pointed to by IP
+           Increment IP by address size
+           Jump to fetched address
+
+  NEST:    Push IP onto call stack
+           Set IP to point to the first address of the called twig routine
+           Execute NEXT
+
+  UNNEST:  Pop IP from call stack
+           Execute NEXT
+
+Indirect Thread Code:
+
+  NEXT:    Fetch into W the address pointed to by IP
+           Increment IP by address size
+		   Fetch into W the address pointed to by W
+           Jump to W
+
+  NEST:    Push IP onto call stack
+           Set IP to W + address size
+           Execute NEXT
+
+  UNNEST:  Pop IP from call stack
+           Execute NEXT
+
+Auxiliary primitives
+
+  (lit)      Fetch into W the address pointed to by IP
+             Increment IP by address size (skip literal)
+             Push W onto the data stack
+             Execute NEXT
+
+  (branch)   Fetch into W the address pointed to by IP
+             Set IP to W
+             Execute NEXT
+
+  (0branch)  Pop a value off the data stack
+             If the value is zero, execute (branch)
+             Otherwise, increment IP by address size (skip branch address)
+
+  <       Pop two values off the data stack
+          If the first is less than the second, push -1
+          Otherwise, push 0
+          Execute NEXT
+
+  0=      Pop a value off the data stack
+          If the value is zero, push -1
+          Otherwise, push 0
+          Execute NEXT
+
+  dup     Pop a value off the data stack
+          Push it back onto data stack
+          Push it a second time
+          Execute NEXT
+
+  2dup    Pop two values off the data stack
+          Push them back onto data stack, in the same order
+          Push them a second time, also in the same order
+          Execute NEXT
+
+  swap    Pop two values off the data stack
+          Push them back onto data stack, in the reverse order
+          Execute NEXT
+
+	if compiles the (0branch), 
+	else compiles the (branch) and resolves the forward (0branch), 
+	then resolves the forward (branch).
+
+	begin compiles no code; 
+	it “marks” the location that (0branch) later branches back to.
+
+	
+	
