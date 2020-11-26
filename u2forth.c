@@ -61,13 +61,11 @@
  * 
  */ 
 
-#define CELL_SIZE      2  
 #define RAM_SIZE    1024  
-#define RAM_OFFSET    64  
+#define RAM_OFFSET    96  
 #define ROM_OFFSET  1024   
 #define FLASH_SIZE  8192  
 #define STACK_SIZE    32  
-#define ALLOC FLASH_SIZE/CELL_SIZE
 
 /*
  * typedef unsigned int uint16_t;
@@ -111,7 +109,7 @@ enum opcodes  {     NOOP=0, THIS, CODE,
                     AND, OR, XOR, INV, CPL, SHL, SHR, 
                     LTZ, GTZ, EQZ, 
 
-					ZERO, ONE, SOT, EOT, LF, FF, CAN, ESC, BS, CR, SPC, CELL
+					ZERO, ONE, SOT, EOT, LF, FF, CAN, ESC, BS, CR, SPC, WORD
                     };
 
 int main ( void ) {
@@ -169,7 +167,7 @@ CODE:
   		case BS: goto BS;
   		case CR: goto CR;
   		case SPC: goto SPC;
-  		case CELL: goto CELL;
+  		case WORD: goto WORD;
         default : goto CODE;
     }
 
@@ -342,7 +340,7 @@ SPC:  /*  ASCII space vi  */
     m = 0x20;
     goto CTES;
 
-CELL:  /*  size of CELL, 2 bytes */
+WORD:  /*  size of CELL, 2 bytes */
     m = 0x02;
     goto CTES;
 

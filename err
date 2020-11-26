@@ -1,28 +1,7 @@
-u2forth.c: In function ‘forth’:
-u2forth.c:86:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     rsp = (uint16_t *) (ram[RAM_SIZE - 2]);
+u2forth.c: In function ‘main’:
+u2forth.c:121:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     rsp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - CELL]);
            ^
-u2forth.c:88:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
+u2forth.c:123:11: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - STACK_SIZE - CELL]);
            ^
-u2forth.c:92:7: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
-     c = (uint8_t *) (rom + ip);
-       ^
-u2forth.c:143:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     t = (uint16_t *) rom[ip];  /*  push the address in ram */
-         ^
-u2forth.c:143:7: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
-     t = (uint16_t *) rom[ip];  /*  push the address in ram */
-       ^
-u2forth.c:151:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     ip = (uint16_t *) rom[ip];
-          ^
-u2forth.c:151:8: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
-     ip = (uint16_t *) rom[ip];
-        ^
-u2forth.c:160:1: warning: label ‘LEAF’ defined but not used [-Wunused-label]
- LEAF:  /*  bytecodes    */
- ^
-u2forth.c:125:1: warning: label ‘TWIG’ defined but not used [-Wunused-label]
- TWIG:  /* opcodes */
- ^
