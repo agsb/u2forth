@@ -14,17 +14,30 @@
  *
  * using avr-gcc -mmcu=atmega8
  *
+ * just to using avr-gcc to make a good startup for asm
+ *
  * model ATMEGA8
+ *
  * virtual 8 bit cpu with 16 bit address
  *
  * u2forth is based in eForth from Dr. Ting
+ * 		using ITC
+ *		using interrupts
+ *		have a timer in miliseconds 
+ *		not use real PC and SP
+ *		forth constants in flash
+ *		forth variables in sram
+ * 		user  constants and variables in sram
  *
  * focus in smaller and smart
  *
  * WARNNING: This C code makes abusive use of goto LABEL:
  * 
- * 
+ *	virtual cpu does bytecodes, words can be leafs or twigs, only.
+ *		leafs only contain bytecodes
+ *		twigs only contains address to word 
  *
+ *  
  *
  *  Copyright © 2020, Alvaro Barcellos, 
  *  Permission is hereby granted, free of charge, to any person obtaining
@@ -62,37 +75,63 @@
  */
 
 
+#include "u2forth.h"
+
+/* timer */
+
+uint32_t  tm ;
+
+/* stacks pointers, parameter and return, in sram */
 uint16_t  *psp, *rsp;
 
-uint16_t  ip, t, n, w;
+/*  parameter stack t, n, m */
+uint16_t  t, n, m;
 
+/* index pointer, work */
+uint16_t  ip, w;
+
+#define ppush()	psp--; psp[0] = n; n = t;	
+
+#define ppull()	t = n; n = psp[0]; psp++;	
+
+#define CELL sizeof(uint16_t) /* 2 */
+
+#define BYTE sizeof(uint8_t)  /* 1 */
+
+/* sram */
 uint8_t c, ram[RAM_SIZE];
 
-const uint8_t rom[1024] PROGMEM = { 0, 1, 2, 3, 4 };
+/* virtual cpu opcodes */
 
-enum opcodes  {     NOOP, THIS, CODE, 
+enum opcodes  {     NOOP=0, THIS, CODE, 
 					NEXT, NEST, UNNEST, 
 					JUMP, JUMPNZ,
                     RTP, R2P, P2R, 
                     DUPNZ, DUP, DROP, SWAP, OVER, 
                     AND, OR, XOR, INV, CPL, SHL, SHR, 
                     LTZ, GTZ, EQZ, 
+
+					ZERO, ONE, SOT, EOT, LF, FF, CAN, ESC, BS, CR, SPC, CELL
                     };
 
-int forth(void) {
+int main ( void ) {
 
     ip = 0;
 
-    rsp = (uint16_t *) (ram[RAM_SIZE - 2]);
+/* leave STACK_SIZE ram for real SP, all stack grows downwards */
 
-    psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - 2]);
+    rsp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - CELL]);
 
+    psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - STACK_SIZE - CELL]);
 
 CODE:
+
     c = pgm_read_byte_near( rom[ip] );
-    ip += 1;
+
+    ip += BYTE;
 
     switch (c) {
+/*	bytecodes	*/
         case NOOP : goto CODE;
         case THIS : goto THIS ;
         case NEXT : goto NEXT ;
@@ -118,6 +157,19 @@ CODE:
         case LTZ: goto LTZ ;
         case GTZ: goto GTZ ;
         case EQZ: goto EQZ ; 
+/*	constants	*/
+  		case ZERO: goto ZERO;
+  		case ONE: goto ONE;
+  		case SOT: goto SOT;
+  		case EOT: goto EOT;
+  		case LF: goto LF;
+  		case FF: goto FF;
+  		case CAN: goto CAN;
+  		case ESC: goto ESC;
+  		case BS: goto BS;
+  		case CR: goto CR;
+  		case SPC: goto SPC;
+  		case CELL: goto CELL;
         default : goto CODE;
     }
 
@@ -130,19 +182,19 @@ NEXT:  /*  w = *ip , ip = *w , goto ???; */
     ip = pgm_read_word_near(rom[w]);
     goto CODE;
 
-NEST: /*  docol or :s , push(ip), ip = w, goto NEXT; */
+NEST: /*  docol or :s , ppush(ip), ip = w, goto NEXT; */
     rsp--; rsp[0] = ip;
-    ip = w;   /*  ???? ITC */
+    ip = w; 		/* real magic done here */ 
     goto NEXT;
 
-UNNEST: /*  dosem or ;s , pull(ip), goto NEXT; */
+UNNEST: /*  dosem or ;s , ppull(ip), goto NEXT; */
     ip = rsp[0]; rsp++;
     goto NEXT;
 
 THIS:  /*  */
-    psp--; psp[0] = t;
-    t = pgm_read_word_near(rom[ip]);  /*  push the address in ram */
-    ip += 2;
+    ppush();
+    t = pgm_read_word_near(rom[ip]);  /*  push in psp */
+    ip += CELL;
     goto NEXT;
 
 JUMPNZ:  /*  ?branch */
@@ -163,78 +215,69 @@ LEAF:  /*  bytecodes    */
 
 P2R:  /*  >R */
     rsp--; rsp[0] = t;
-    t = psp[0]; psp++;
+    ppull();
     goto CODE;
 
 R2P:  /*  R> */
-    psp--; psp[0] = t;
+    ppush();
     t = rsp[0]; rsp++;
     goto CODE;
 
 RTP:  /*  R@ */
-    psp--; psp[0] = t; 
+    ppush(); 
     t = rsp[0];
     goto CODE;
 
-/*PULL: */
 DROP:  /*  ( W1 -- ) */
-    t = psp[0]; psp++;
+    ppull()
     goto CODE;
 
 DUPNZ:  /*  ( w1 -- 0 | w1 w1 ) */
-    if (n != 0) psp--; psp[0] = t;
-    goto CODE;
+    if (t == 0) goto CODE;
 
-/* PUSH: */
 DUP:  /*  ( w1 -- w1 w1 ) */
-    psp--; psp[0] = t;
+	ppush();
     goto CODE;
 
 OVER:  /*  ( w1 w2 -- w1 w2 w1 ) */
-    n = psp[0]; 
-    psp--; psp[0] = t;
-    t = n;
+    m = n; 
+CTES:
+    ppush();
+    t = m;
     goto CODE;
 
 SWAP:  /*  ( w1 w2 -- w2 w1 ) */
+	m = n;
     n = t;
-    t = psp[0];
-    psp[0] = n;
+	t = m;
     goto CODE;
 
 AND:  /*  logical and */
-    n = psp[0]; psp++;
-    t = t & n;
-    goto CODE;
+    n = t & n;
+    goto DROP;
 
 OR:  /*  logical or  */
-    n = psp[0]; psp++;
-    t = t | n;
-    goto CODE;
+    n = t | n;
+    goto DROP;
 
 XOR:  /*  logical xor */
-    n = psp[0]; psp++;
-    t = t ^ n;
-    goto CODE;
+    n = t ^ n;
+    goto DROP;
+
+SHL:  /*  shift left, multiply by 2 */
+    n = t << n;
+    goto DROP;
+
+SHR:  /*  shift right, divide by 2 */
+    n = t >> n;
+    goto DROP;
 
 INV:  /*  invert bits */
-    n = psp[0]; psp++;
     t = ~ t;
     goto CODE;
 
 CPL:  /*  two complement */
-    n = psp[0]; psp++;
     t = ~ t + 1;
-    goto CODE;
-
-SHL:  /*  shift left, multiply by 2 */
-    n = psp[0]; psp++;
-    t = t << n;
-    goto CODE;
-
-SHR:  /*  shift right, divide by 2 */
-    n = psp[0]; psp++;
-    t = t >> n;
     goto CODE;
 
 LTZ:  /*  less than zero */
@@ -251,94 +294,56 @@ EQZ:  /*  equal zero */
 
 /*
  *
- * push a constant to parameter stack 
+ * ppush a constant to parameter stack 
  *
  */
 
-{
-
-uint8_t c;
-
-enum ctes { ZERO, ONE, TWO, SOT, EOT, DEC, LF, FF, HEX, CAN, ESC, BS, CR, SPC, CELL };
-
-switch(c) {
-  case ZERO: goto ZERO;
-  case ONE: goto ONE;
-  case TWO: goto TWO;
-  case SOT: goto SOT;
-  case EOT: goto EOT;
-  case DEC: goto DEC;
-  case LF: goto LF;
-  case FF: goto FF;
-  case HEX: goto HEX;
-  case CAN: goto CAN;
-  case ESC: goto ESC;
-  case BS: goto BS;
-  case CR: goto CR;
-  case SPC: goto SPC;
-  case CELL: goto CELL;
-  default:
-    goto CTES;
-  }
-}
-
-CTES:
-    psp--; psp[0] = t;
-    t = n;
-    goto CODE;
-
 ZERO:  /*  ASCII null */
-    n = 0x00;
+    m = 0x00;
     goto CTES;
 
 ONE:
-    n = 0x01;
+    m = 0x01;
     goto CTES;
 
-TWO:
 SOT:  /*  ASCII Start of text */
-    n = 0x02;
+    m = 0x02;
     goto CTES;
 
 EOT:  /*  ASCII end of text */
-    n = 0x03;
+    m = 0x03;
     goto CTES;
 
-DEC:
 LF:  /*  ASCII line feed */
-    n = 0x0A;
+    m = 0x0A;
     goto CTES;
 
 FF:  /*  ASCII form feed */
-    n = 0x0C;
-    goto CTES;
-
-HEX:  /*  base 16 */
-    n = 0x10;
+    m = 0x0C;
     goto CTES;
 
 CAN:  /*  ASCII cancel */
-    n = 0x18;
+    m = 0x18;
     goto CTES;
 
 ESC:  /*  ASCII escape */
-    n = 0x1B;
+    m = 0x1B;
     goto CTES;
 
 BS:  /*  ASCII backspace */
-    n = 0x08;
+    m = 0x08;
     goto CTES;
 
 CR:  /*  ASCII cariage return */
-    n = 0x0D;
+    m = 0x0D;
     goto CTES;
 
 SPC:  /*  ASCII space vi  */
-    n = 0x20;
+    m = 0x20;
     goto CTES;
 
 CELL:  /*  size of CELL, 2 bytes */
-    n = 0x02;
+    m = 0x02;
     goto CTES;
 
 /* NEVER HERE LAND */
@@ -346,14 +351,9 @@ CELL:  /*  size of CELL, 2 bytes */
 EXIT:
     goto EXIT;
 
-    return (1);
+    return (0);
 
     }
 
-int main ( int argc, char * argv[] ) {
-
-    return (forth());
-
-}
 
 
