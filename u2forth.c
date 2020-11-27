@@ -111,18 +111,24 @@
 
 #include "u2forth.h"
 
+#define NO_INIT __attribute__ ((section (".noinit")))
+
 /* timer */
 
 uint32_t  tm ;
 
 /* stacks pointers, parameter and return, in sram */
-uint16_t  *psp, *rsp;
+uint16_t  *psp NO_INIT ;
+uint16_t  *rsp NO_INIT ;
 
 /*  parameter stack t, n, m */
-uint16_t  t, n, m;
+uint16_t  t NO_INIT ;
+uint16_t  n NO_INIT ;
+uint16_t  m NO_INIT ;
 
 /* index pointer, work */
-uint16_t  ip, w;
+uint16_t  ip NO_INIT ;
+uint16_t  w  NO_INIT ;;
 
 /* sram */
 uint8_t c, ram[RAM_SIZE];
@@ -152,27 +158,30 @@ uint8_t c, ram[RAM_SIZE];
 /* virtual cpu opcodes */
 
 enum opcodes  {     
-	NOOP=0, THIS, CODE, 
+    NOOP=0, THIS, CODE, 
     NEXT, NEST, UNNEST, 
-	JUMP, JUMPNZ,
-	RTP, R2P, P2R, 
-	DUPNZ, DUP, DROP, SWAP, OVER, 
-	AND, OR, XOR, INV, CPL, SHL, SHR, 
-	LTZ, GTZ, EQZ, 
-	CMOVE, CCOMP, MOVE, COMP,
-	STORE, FETCH, CSTORE, CFETCH, 
-	RXQU, RXCU, TXCU, IOSU,
-	ZERO, ONE, SOT, EOT, LF, FF, CAN, ESC, BS, CR, SPC, WORD
+    JUMP, JUMPNZ,
+    RTP, R2P, P2R, 
+    DUPNZ, DUP, DROP, SWAP, OVER, ROT, DROP2, DUP2, 
+    CSTORE, CFETCH, STORE, FETCH, 
+    CMOVE, CCOMP, MOVE, COMP,
+    EQZ, LTZ, GTZ, 
+    AND, OR, XOR, INV, CPL, SHL, SHR, 
+    RXQU, RXCU, TXCU, IOSU,
+    ZERO, ONE, SOT, EOT, LF, FF, CAN, ESC, BS, CR, SPC, WORD
     };
 
-int main ( void ) {
+
+void main ( void ) __attribute__((noreturn)); 
+
+void main (void ) {
 
 
 /* leave STACK_SIZE ram for real SP, for sake, all stack grows downwards */
 
-    rsp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - CELL]);
+    rsp = (uint16_t *) &(ram[RAM_SIZE - STACK_SIZE - CELL]);
 
-    psp = (uint16_t *) (ram[RAM_SIZE - STACK_SIZE - STACK_SIZE - CELL]);
+    psp = (uint16_t *) &(ram[RAM_SIZE - STACK_SIZE - STACK_SIZE - CELL]);
 
     ip = 0;
 
@@ -180,7 +189,7 @@ CODE:
 
 /*  bytecodes    */
 
-    c = pgm_read_byte_near( rom[ip] );
+    c = pgm_read_byte_near( &(rom[ip]) );
 
     ip += BYTE;
 
@@ -188,7 +197,7 @@ CODE:
 
         case NOOP : goto CODE;
 
-/*	interpreter */
+/*    interpreter */
         case THIS : goto THIS ;
         case NEXT : goto NEXT ;
         case NEST : goto NEST ; 
@@ -196,41 +205,50 @@ CODE:
         case JUMP : goto JUMP ;
         case JUMPNZ : goto JUMPNZ ;
 
-/*	stack */
+/* using both stacks */
         case RTP : goto RTP ; 
         case R2P : goto R2P ; 
         case P2R : goto P2R ;
+
+/* using parameter stack */
         case DUPNZ : goto DUPNZ ; 
         case DUP : goto DUP ; 
         case DROP : goto DROP ; 
         case SWAP : goto SWAP ; 
         case OVER : goto OVER ;
-        case AND: ; goto AND ;
+        case ROT : goto ROT ;
+        case DROP2 : goto DROP2 ;
+        case DUP2 : goto DUP2 ;
+
+/* moving */
+        case STORE: goto STORE ;
+        case FETCH: goto FETCH ;
+        case CSTORE: goto CSTORE ;
+        case CFETCH: goto CFETCH ;
+        case CMOVE: goto CMOVE ; 
+        case CCOMP: goto CCOMP ; 
+        case MOVE: goto MOVE ; 
+        case COMP: goto COMP ; 
+
+/* logical */
+        case EQZ: goto EQZ ;
+        case LTZ: goto LTZ ;
+        case GTZ: goto GTZ ;
+        case AND: goto AND ;
         case OR: goto OR ; 
         case XOR: goto XOR ; 
         case INV: goto INV ;
         case CPL: goto CPL ; 
         case SHL: goto SHL ;
         case SHR: goto SHR ; 
-        case LTZ: goto LTZ ;
-        case GTZ: goto GTZ ;
-        case EQZ: goto EQZ ; 
-        case CMOVE: goto CMOVE ; 
-        case CCOMP: goto CCOMP ; 
-        case MOVE: goto MOVE ; 
-        case COMP: goto COMP ; 
-		case STORE: goto STORE ;
-		case FETCH: goto FETCH ;
-		case CSTORE: goto CSTORE ;
-		case CFETCH: goto CFETCH ;
 
-/*	usart stuff */
-		case RXQU: goto RXQU ;
-		case RXCU: goto RXCU ;
-		case TXCU: goto TXCU ;
-		case IOSU: goto IOSU ;
+/*    usart stuff */
+        case RXQU: goto RXQU ;
+        case RXCU: goto RXCU ;
+        case TXCU: goto TXCU ;
+        case IOSU: goto IOSU ;
 
-/*	constants    */
+/*    constants    */
         case ZERO: goto ZERO;
         case ONE: goto ONE;
         case SOT: goto SOT;
@@ -244,7 +262,7 @@ CODE:
         case SPC: goto SPC;
         case WORD: goto WORD;
 
-/*	just init or panic */
+/*    just init or panic */
         default : goto CODE;
     }
 
@@ -256,35 +274,35 @@ IOSU:
     UCSRB = (1<<RXEN)|(1<<TXEN);  
     /* config USART frame 8N1 */
     UCSRC = (1<<URSEL)|(1<<UCSZ1)|(1<<UCSZ0);  
-	/* config USART mode asynchonous */
-	UCSRC |= (1<<UMSEL); 
-	goto CODE;
+    /* config USART mode asynchonous */
+    UCSRC |= (1<<UMSEL); 
+    goto CODE;
 
 TXCU:
-	/* wait and transmit */
-	while((UCSRA & (1<<UDRE) ) == 0);
-	UDR = t & 0x00FF;
-	goto DROP;
+    /* wait and transmit */
+    while((UCSRA & (1<<UDRE) ) == 0);
+    UDR = t & 0x00FF;
+    goto DROP;
 
 RXCU:
-	/* wait and receive */
-	ppush();
-	while((UCSRA & (1<<RXC) ) == 0);
-	t = UDR;
-	goto CODE;
-	
+    /* wait and receive */
+    ppush();
+    while((UCSRA & (1<<RXC) ) == 0);
+    t = UDR;
+    goto CODE;
+    
 RXQU:
-	/* test if available */
-	ppush();
-	t = ( UCSRA & (1<<RXC) ) ;
-	goto CODE;
+    /* test if available */
+    ppush();
+    t = ( UCSRA & (1<<RXC) ) ;
+    goto CODE;
 
 TWIG:  /* opcodes */
     goto TWIG;
 
 NEXT:  /*  w = *ip , ip = *w , goto ???; */
-    w = pgm_read_word_near(rom[ip]);  
-    ip = pgm_read_word_near(rom[w]);
+    w = pgm_read_word_near(&(rom[ip]));  
+    ip = pgm_read_word_near(&(rom[w]));
     goto CODE;
 
 NEST: /*  docol or :s , ppush(ip), ip = w, goto NEXT; */
@@ -298,7 +316,7 @@ UNNEST: /*  dosem or ;s , ppull(ip), goto NEXT; */
 
 THIS:  /* push next literal word on dictionary into psp */
     ppush();
-    t = pgm_read_word_near(rom[ip]);  /*  push in psp */
+    t = pgm_read_word_near(&(rom[ip]));  /*  push in psp */
     ip += CELL;
     goto NEXT;
 
@@ -306,7 +324,7 @@ JUMPNZ:  /*  ?branch */
     if (t != 0) goto NEXT;
 
 JUMP:  /*  branch */
-    ip = pgm_read_word_near(rom[ip]);
+    ip = pgm_read_word_near(&(rom[ip]));
     goto NEXT;    
 
 /*
@@ -353,27 +371,75 @@ CTES:
 SWAP:  /*  ( w1 w2 -- w2 w1 ) */
     m = n;
     n = t;
-	goto CTES;
+    goto CTES;
+
+ROT:	/*	( w1 w2 w3 -- w2 w3 w1 ) */
+    m = psp[0];
+	psp[0] = n;
+	n = t;
+	t = m;
+	goto CODE;
+
+DROP2:
+    t = psp[0]; psp++;
+    n = psp[0]; psp++;
+    goto CODE;
+
+DUP2:
+    psp--; psp[0] = n;
+    psp--; psp[0] = t;
+    goto CODE;
+
+SWAP2:
+	goto CODE;
 
 CFETCH: /* C@ */
     t = (uint16_t) ram[t];
-	goto CODE;
-
-CSTORE: /* C! */
-	ram[t] = (uint8_t) n;
-	goto DROP2;
+    goto CODE;
 
 FETCH: /* @ */
-    t = (uint16_t *) ram[t];
-	goto CODE;
+    t = ((uint16_t *) &(ram[t]))[0];
+    goto CODE;
+
+CSTORE: /* C! */
+    ram[t] = (uint8_t) n;
+    goto DROP2;
 
 STORE: /* ! */
-    ram[t] = (uint8_t) n;
+    ((uint16_t *) (&ram[t]))[0] = n;
+    goto DROP2;
+	
+CMOVE: /* ( w2 w1 n -- ) move bytes */
+    m = psp[0]; 
+    psp++;
+    while (t) {
+        ram[n] = ram[m];
+        n += 1;
+        m += 1;
+        t -= 1;
+        }
+    goto DROP2;
 
-DROP2:
-	t = psp[0]; psp++;
-	n = psp[0]; psp++;
-	goto CODE;
+CCOMP: /* ( w2 w1 n -- 0 | t ) compare bytes, zero if all equal, t where differ  */
+    m = psp[0];
+    psp++;
+    while (t) {
+        if (ram[n] != ram[m]) break;
+        n += 1;
+        m += 1;
+        t -= 1;
+        }
+    m = t;
+    ppull();
+    goto CTES;
+
+MOVE: /* ( w2 w1 n -- ) move sequencial words */
+    t = t << 1;
+    goto CMOVE;
+
+COMP: /* ( w2 w1 n -- ) compare sequencial words */
+    t = t << 1;
+    goto CCOMP;
 
 AND:  /*  logical and */
     n = t & n;
@@ -414,38 +480,6 @@ GTZ:  /*  greater than zero */
 EQZ:  /*  equal zero */
     t = ( t == 0 ) ? -1 : 0;
     goto CODE;
-
-CMOVE: /* ( w2 w1 n -- ) move bytes */
-    m = psp[0]; 
-	psp++;
-    while (t) {
-        ram[n] = ram[m];
-        n += 1;
-        m += 1;
-        t -= 1;
-        }
-	goto DROP2;
-
-CCOMP: /* ( w2 w1 n -- 0 | t ) compare bytes, zero if all equal, t where differ  */
-    m = psp[0];
-	psp++;
-    while (t) {
-        if (ram[n] != ram[m]) break;
-        n += 1;
-        m += 1;
-        t -= 1;
-        }
-    m = t;
-    ppull();
-	goto CTES;
-
-MOVE: /* ( w2 w1 n -- ) move sequencial words */
-    t = t << 1;
-    goto CMOVE;
-
-COMP: /* ( w2 w1 n -- ) compare sequencial words */
-    t = t << 1;
-    goto CCOMP;
 
 /*
  *
@@ -507,7 +541,13 @@ WORD:  /*  size of CELL, 2 bytes */
 EXIT:
     goto EXIT;
 
-    return (0);
+/*
+
+  is void
+
+  return (0);
+
+*/
 
     }
 
