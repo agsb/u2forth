@@ -86,6 +86,15 @@
  * focus in smaller and smart
  *
  * WARNNING: This C code makes abusive use of goto LABEL:
+ *
+ * usefull vi expressions
+ *
+ * 	.s/\([^,]\+\),/    case \1: goto \1 ;^M/g
+ *
+ * 	.s/\([^,]\+\),/\1:^M    m = ;^M    goto CTES;^M^M/g
+ *
+ *
+ *  TIPS: sort enum over more used opcodes
  */
 
 /*
@@ -103,6 +112,19 @@
 #define ROM_OFFSET  1024   
 #define FLASH_SIZE  8192  
 #define STACK_SIZE    32  
+#define TIB_SIZE	  80
+#define PAD_SIZE	 128
+
+/* reserve 32 bytes plus one cell for real STACK */
+#define RAM_BOT (RAM_SIZE - STACK_SIZE - TWOBYTE)
+#define RSP_TOP	(RAM_BOT)
+#define PSP_TOP	(RSP_TOP - STACK_SIZE)
+
+#define TIB_TOP (RAM_OFFSET)
+#define PAD0_TOP (TIB_TOP - TIB_SIZE)
+#define PAD1_TOP (PAD0_TOP - PAD_SIZE)
+
+#define HEAP	(PAD1_TOP - PAD_SIZE)   	 
 
 /*
  * typedef unsigned int uint16_t;
@@ -131,15 +153,24 @@ uint16_t  ip NO_INIT ;
 uint16_t  w  NO_INIT ;;
 
 /* sram */
-uint8_t c, ram[RAM_SIZE];
+uint8_t c NO_INIT;
+uint8_t ram[RAM_SIZE] NO_INIT;
 
 #define ppush()    psp--; psp[0] = n; n = t;    
 
 #define ppull()    t = n; n = psp[0]; psp++;    
 
-#define CELL sizeof(uint16_t) /* 2 */
+#define TWOBYTE sizeof(uint16_t) /* 2 */
 
-#define BYTE sizeof(uint8_t)  /* 1 */
+#define ONEBYTE sizeof(uint8_t)  /* 1 */
+
+#define F_IMMEDIATE (0x80)
+
+#define F_HIDDEN (0x40) 
+
+#define F_RESERVED (0x20)
+
+#define M_SIZEWORD (0x1F)
 
 /* 
  *  from avr-gcc, arduino files 
@@ -168,7 +199,15 @@ enum opcodes  {
     EQZ, LTZ, GTZ, 
     AND, OR, XOR, INV, CPL, SHL, SHR, 
     RXQU, RXCU, TXCU, IOSU,
-    ZERO, ONE, SOT, EOT, LF, FF, CAN, ESC, BS, CR, SPC, WORD
+
+	CELL, FALSE, TRUE, PAD, TIB, BL,
+
+	PAD0, PAD1, TIB0, PSP0, RSP0,
+
+	PSPP, RSPP, BASE, SPAM, CSP, HOLD, CONTEXT, CURRENT, TOIN, LAST, NP, CP,
+
+    ZERO, ONE, SOT, EOT, LF, FF, DLE, CAN, ESC, BS, CR
+
     };
 
 
@@ -179,92 +218,120 @@ void main (void ) {
 
 /* leave STACK_SIZE ram for real SP, for sake, all stack grows downwards */
 
-    rsp = (uint16_t *) &(ram[RAM_SIZE - STACK_SIZE - CELL]);
+    rsp = (uint16_t *) &(ram[RSP_TOP]);
 
-    psp = (uint16_t *) &(ram[RAM_SIZE - STACK_SIZE - STACK_SIZE - CELL]);
+    psp = (uint16_t *) &(ram[PSP_TOP]);
 
     ip = 0;
 
 CODE:
 
-/*  bytecodes    */
+/* bytecodes */
 
-    c = pgm_read_byte_near( &(rom[ip]) );
+ c = pgm_read_byte_near( &(rom[ip]) );
 
-    ip += BYTE;
+ ip += ONEBYTE;
 
-    switch (c) {
+ switch (c) {
 
-        case NOOP : goto CODE;
+ case NOOP : goto CODE;
 
-/*    interpreter */
-        case THIS : goto THIS ;
-        case NEXT : goto NEXT ;
-        case NEST : goto NEST ; 
-        case UNNEST : goto UNNEST ; 
-        case JUMP : goto JUMP ;
-        case JUMPNZ : goto JUMPNZ ;
+/* interpreter */
+ case THIS : goto THIS ;
+ case NEXT : goto NEXT ;
+ case NEST : goto NEST ; 
+ case UNNEST : goto UNNEST ; 
+ case JUMP : goto JUMP ;
+ case JUMPNZ : goto JUMPNZ ;
 
 /* using both stacks */
-        case RTP : goto RTP ; 
-        case R2P : goto R2P ; 
-        case P2R : goto P2R ;
+ case RTP : goto RTP ; 
+ case R2P : goto R2P ; 
+ case P2R : goto P2R ;
 
 /* using parameter stack */
-        case DUPNZ : goto DUPNZ ; 
-        case DUP : goto DUP ; 
-        case DROP : goto DROP ; 
-        case SWAP : goto SWAP ; 
-        case OVER : goto OVER ;
-        case ROT : goto ROT ;
-        case DROP2 : goto DROP2 ;
-        case DUP2 : goto DUP2 ;
+ case DUPNZ : goto DUPNZ ; 
+ case DUP : goto DUP ; 
+ case DROP : goto DROP ; 
+ case SWAP : goto SWAP ; 
+ case OVER : goto OVER ;
+ case ROT : goto ROT ;
+ case DROP2 : goto DROP2 ;
+ case DUP2 : goto DUP2 ;
 
 /* moving */
-        case STORE: goto STORE ;
-        case FETCH: goto FETCH ;
-        case CSTORE: goto CSTORE ;
-        case CFETCH: goto CFETCH ;
-        case CMOVE: goto CMOVE ; 
-        case CCOMP: goto CCOMP ; 
-        case MOVE: goto MOVE ; 
-        case COMP: goto COMP ; 
+ case STORE: goto STORE ;
+ case FETCH: goto FETCH ;
+ case CSTORE: goto CSTORE ;
+ case CFETCH: goto CFETCH ;
+ case CMOVE: goto CMOVE ; 
+ case CCOMP: goto CCOMP ; 
+ case MOVE: goto MOVE ; 
+ case COMP: goto COMP ; 
 
 /* logical */
-        case EQZ: goto EQZ ;
-        case LTZ: goto LTZ ;
-        case GTZ: goto GTZ ;
-        case AND: goto AND ;
-        case OR: goto OR ; 
-        case XOR: goto XOR ; 
-        case INV: goto INV ;
-        case CPL: goto CPL ; 
-        case SHL: goto SHL ;
-        case SHR: goto SHR ; 
+ case EQZ: goto EQZ ;
+ case LTZ: goto LTZ ;
+ case GTZ: goto GTZ ;
+ case AND: goto AND ;
+ case OR: goto OR ; 
+ case XOR: goto XOR ; 
+ case INV: goto INV ;
+ case CPL: goto CPL ; 
+ case SHL: goto SHL ;
+ case SHR: goto SHR ; 
 
-/*    usart stuff */
-        case RXQU: goto RXQU ;
-        case RXCU: goto RXCU ;
-        case TXCU: goto TXCU ;
-        case IOSU: goto IOSU ;
+/* const address */
+ case PAD0: goto PAD0 ; 
+ case PAD1: goto PAD1 ; 
+ case TIB0: goto TIB0 ;
+ case PSP0: goto PSP0 ;
+ case RSP0: goto RSP0 ;
 
-/*    constants    */
-        case ZERO: goto ZERO;
-        case ONE: goto ONE;
-        case SOT: goto SOT;
-        case EOT: goto EOT;
-        case LF: goto LF;
-        case FF: goto FF;
-        case CAN: goto CAN;
-        case ESC: goto ESC;
-        case BS: goto BS;
-        case CR: goto CR;
-        case SPC: goto SPC;
-        case WORD: goto WORD;
+/* variable address */
+ case PSPP: goto PSPP ;
+ case RSPP: goto RSPP ;
+ case BASE: goto BASE ;
+ case SPAM: goto SPAM ;
+ case CSP: goto CSP ;
+ case HOLD: goto HOLD ;
+ case CONTEXT: goto CONTEXT ;
+ case CURRENT: goto CURRENT ;
+ case TOIN: goto TOIN ;
+ case LAST: goto LAST ;
+ case NP: goto NP ;
+ case CP: goto CP ;
 
-/*    just init or panic */
-        default : goto CODE;
-    }
+/* usart stuff */
+ case RXQU: goto RXQU ;
+ case RXCU: goto RXCU ;
+ case TXCU: goto TXCU ;
+ case IOSU: goto IOSU ;
+
+/* standart constants */
+ case CELL: goto CELL ;
+ case FALSE: goto FALSE ;
+ case TRUE: goto TRUE ;
+ case PAD: goto PAD ;
+ case TIB: goto TIB ;
+ case BL: goto BL ;
+
+/* constants */
+ case ZERO: goto ZERO;
+ case ONE: goto ONE;
+ case SOT: goto SOT;
+ case EOT: goto EOT;
+ case LF: goto LF;
+ case FF: goto FF;
+ case CAN: goto CAN;
+ case DLE: goto DLE;
+ case ESC: goto ESC;
+ case BS: goto BS;
+ case CR: goto CR;
+
+/* just init or panic */
+  default : goto CODE;
+  }
 
 IOSU:
     /* set baud rate */
@@ -363,10 +430,15 @@ DROP:  /*  ( W1 -- ) */
 
 OVER:  /*  ( w1 w2 -- w1 w2 w1 ) */
     m = n; 
+
 CTES:
     ppush();
     t = m;
     goto CODE;
+
+VARS:
+	m = (uint16_t *)(&ram[m]);
+	goto CTES;
 
 SWAP:  /*  ( w1 w2 -- w2 w1 ) */
     m = n;
@@ -398,7 +470,7 @@ CFETCH: /* C@ */
     goto CODE;
 
 FETCH: /* @ */
-    t = ((uint16_t *) &(ram[t]))[0];
+    t = ((uint16_t *) (&ram[t]))[0];
     goto CODE;
 
 CSTORE: /* C! */
@@ -481,59 +553,160 @@ EQZ:  /*  equal zero */
     t = ( t == 0 ) ? -1 : 0;
     goto CODE;
 
+/* constants */
+
+CELL:
+	m = TWOBYTE;
+	goto CTES;
+
+FALSE:
+	m = 0 ; 
+	goto CTES;
+
+TRUE:
+	m = -1 ;
+	goto CTES;
+	
+PAD:
+	goto CTES;
+
+TIB:
+	goto CTES;
+
+BL:
+	m = 32 ;
+	goto CTES;
+
 /*
  *
+ * ppush a fixed address to parameter stack 
+ *
+ */
+
+PAD0:
+	m = PAD0_TOP; 
+	goto CTES;
+
+PAD1:
+	m = PAD1_TOP;
+	goto CTES;
+
+TIB0: 
+	m = TIB_TOP;
+	goto CTES;
+
+RSP0:
+	m = RSP_TOP;
+	goto CTES;
+
+PSP0:
+	m = PSP_TOP;
+	goto CTES;
+
+/*
+*
+* push address of forth variables in sram, 
+* offsets of ram, or indexes, 
+* need work to emule .DW in asm
+*
+*/
+	
+PSPP:
+    m = 2;
+    goto VARS;
+
+RSPP:
+    m = 4;
+    goto VARS;
+
+BASE:
+    m = 6;
+    goto VARS;
+
+SPAM:
+    m = 8;
+    goto VARS;
+
+HOLD:
+    m = 10;
+    goto VARS;
+
+CONTEXT:
+    m = 12;
+    goto VARS;
+
+CURRENT:
+    m = 14;
+    goto VARS;
+
+TOIN:
+    m = 16;
+    goto VARS;
+
+LAST:
+    m = 18;
+    goto VARS;
+
+NP:
+    m = 20;
+    goto VARS;
+
+CP:
+    m = 22;
+    goto VARS;
+
+CSP:
+    m = 24;
+    goto VARS;
+
+/*
  *
  * ppush a constant to parameter stack 
  *
  */
 
-ZERO:  /*  ASCII null */
+ZERO: /* 0  ASCII null */
     m = 0x00;
     goto CTES;
 
-ONE:
+ONE:  /* 1 ASCII start of heading */
     m = 0x01;
     goto CTES;
 
-SOT:  /*  ASCII Start of text */
+SOT:  /* 2 ASCII Start of text */
     m = 0x02;
     goto CTES;
 
-EOT:  /*  ASCII end of text */
+EOT:  /* 3 ASCII end of text */
     m = 0x03;
     goto CTES;
 
-LF:  /*  ASCII line feed */
-    m = 0x0A;
-    goto CTES;
-
-FF:  /*  ASCII form feed */
-    m = 0x0C;
-    goto CTES;
-
-CAN:  /*  ASCII cancel */
-    m = 0x18;
-    goto CTES;
-
-ESC:  /*  ASCII escape */
-    m = 0x1B;
-    goto CTES;
-
-BS:  /*  ASCII backspace */
+BS:   /* 8 ASCII backspace */
     m = 0x08;
     goto CTES;
 
-CR:  /*  ASCII cariage return */
+LF:   /* 10 ASCII line feed */
+    m = 0x0A;
+    goto CTES;
+
+FF:   /* 12  ASCII form feed */
+    m = 0x0C;
+    goto CTES;
+
+CR:   /* 13 ASCII cariage return */
     m = 0x0D;
     goto CTES;
 
-SPC:  /*  ASCII space vi  */
-    m = 0x20;
+DLE:  /* 16 ASCII data link escape */
+    m = 0x10;
     goto CTES;
 
-WORD:  /*  size of CELL, 2 bytes */
-    m = 0x02;
+CAN:  /* 24 ASCII cancel */
+    m = 0x18;
+    goto CTES;
+
+ESC:  /* 27 ASCII escape */
+    m = 0x1B;
     goto CTES;
 
 /* NEVER HERE LAND */

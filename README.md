@@ -11,7 +11,7 @@ b32b6114-2abc-11eb-8261-1be5f55f2874 Thu, 19 Nov 2020 20:12:31 -0300
   
   This is a experience in progress, using avr-gcc -mmcu=atmega8 and to make a good  code for avr-asm
 
-  WARNNING: This C code makes abusive use of goto LABEL:
+  WARNING: This C code makes abusive use of goto LABEL:
 
   The code is simply a enum, a switch, and many gotos.
   
@@ -48,9 +48,9 @@ b32b6114-2abc-11eb-8261-1be5f55f2874 Thu, 19 Nov 2020 20:12:31 -0300
          
           the twigs only contains address to words.
  
-  WARNNING: This C code makes abusive use of goto LABEL:
+  WARNING: This C code makes abusive use of goto LABEL:
   
-  WARNNING: Much code was borrowed from internet, with GPL licence, please help me to get all references. 
+  WARNING: Much code was borrowed from internet, with GPL licence, please help me to get all references. 
 
 # Dictionary
 
@@ -156,11 +156,11 @@ The forth internal variables are static in sram
   
   __PSP__  return stack pointer index (psp), r26r27 X
   
-  __RSP__  parameter stack pointer index (rsp), r26r27 X
+  __RSP__  parameter stack pointer index (rsp), r28r29 Y
   
-  flash        Not used, reserved for flash read/write, r26r27 X
+  flash        Not used, reserved for flash read/write, r30r31 Z
   
-  SP          Not used, reserved for real cpu and interrups
+  SP          Not used, reserved for real cpu and interrupts
   
   PC          Not used, reserved for real cpu work :)
   
