@@ -1,0 +1,5 @@
+
+#git checkout origin/main -- README.md
+
+wget https://raw.githubusercontent.com/agsb/u2forth/main/README.md
+
