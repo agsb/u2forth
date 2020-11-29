@@ -46,18 +46,6 @@
  *
  * most risc cpus have at least 32 registers, 
  *
- * r00    c
- * r01    reserved always 0, 
- * r16r17 w,
- * r18r19 ip,
- * r20r21 m, 
- * r22r23 n, 
- * r24r25 tos, 
- * r26r27 X index, psp
- * r28r29 Y index, rsp
- * r30r31 Z index  reserved for flash read/write
- * SP     reserved for real cpu and interrups
- *
  * as avr-gcc stats:
  *     __SREG__      Status register at address0x3F
  *  __SP_H__      Stack pointer high byte ataddress 0x3E
@@ -66,65 +54,43 @@
  *  __zero_reg__  Register r1, always zero
  *  _PC_          Program counter
  *
- * u2forth is based in eForth from Dr. Ting, except for
- *
- *        1. using ITC, 
- *        2. using interrupts, 
- *        3. have a timer in miliseconds, vide 2 
- *        4. not use real PC and SP, vide 2
- *        5. forth constants in flash
- *        6. forth variables in sram
- *        7. user constants and variables in sram
- *        8. USART
- *        9. I2C
- *       10. NO memory check for ANY function
- *
- * virtual cpu does bytecodes, words can be leafs or twigs, only.
- *        leafs only contain bytecodes
- *        twigs only contains address to word 
- *
  * focus in smaller and smart
  *
  * WARNNING: This C code makes abusive use of goto LABEL:
  *
  * usefull vi expressions
  *
- * 	.s/\([^,]\+\),/    case \1: goto \1 ;^M/g
+ *     .s/\([^,]\+\),/    case \1: goto \1 ;^M/g
  *
- * 	.s/\([^,]\+\),/\1:^M    m = ;^M    goto CTES;^M^M/g
+ *     .s/\([^,]\+\),/\1:^M    w = ;^M    goto CTES;^M^M/g
  *
  *
- *  TIPS: sort enum over more used opcodes
+ *  TODO! sort enum over more used opcodes
  */
 
-/*
- * 
- * If clock is internal 8,000,000 MHz and USART at a speed of 9600bps, classic 8 N 1. 
- *
- * The value of UBBR0 should be UBBR0 = ((8,000,000 / 16*9600) -1) = 51 ( Rounded )
- *
- * #define BAUD_PRESCALER 51 
- * 
- */ 
 
 #define RAM_SIZE    1024  
 #define RAM_OFFSET    96  
 #define ROM_OFFSET  1024   
 #define FLASH_SIZE  8192  
 #define STACK_SIZE    32  
-#define TIB_SIZE	  80
-#define PAD_SIZE	 128
+#define TIB_SIZE      80
+#define PAD_SIZE     128
 
-/* reserve 32 bytes plus one cell for real STACK */
-#define RAM_BOT (RAM_SIZE - STACK_SIZE - TWOBYTE)
-#define RSP_TOP	(RAM_BOT)
-#define PSP_TOP	(RSP_TOP - STACK_SIZE)
+/*     leave STACK_SIZE ram for real SP, 
+    all stack grows downwards 
+    reserve 32 bytes plus one cell for real STACK 
+*/
+
+#define RAM_BOT (RAM_SIZE - STACK_SIZE - V_TWOBYTE)
+#define RSP_TOP (RAM_BOT)
+#define PSP_TOP (RSP_TOP - STACK_SIZE)
 
 #define TIB_TOP (RAM_OFFSET)
 #define PAD0_TOP (TIB_TOP - TIB_SIZE)
 #define PAD1_TOP (PAD0_TOP - PAD_SIZE)
 
-#define HEAP	(PAD1_TOP - PAD_SIZE)   	 
+#define HEAP    (PAD1_TOP - PAD_SIZE)        
 
 /*
  * typedef unsigned int uint16_t;
@@ -133,36 +99,38 @@
 
 #include "u2forth.h"
 
+/* from avr-gcc arquives */
+
 #define NO_INIT __attribute__ ((section (".noinit")))
 
-/* timer */
+/* index offsets, for parameter stack and return stack, in sram */
 
-uint32_t  tm ;
+uint16_t  psp NO_INIT ;
+uint16_t  rsp NO_INIT ;
 
-/* stacks pointers, parameter and return, in sram */
-uint16_t  *psp NO_INIT ;
-uint16_t  *rsp NO_INIT ;
-
-/*  parameter stack t, n, m */
+/*  parameter stack t, n, w */
 uint16_t  t NO_INIT ;
 uint16_t  n NO_INIT ;
-uint16_t  m NO_INIT ;
+uint16_t  w NO_INIT ;;
 
 /* index pointer, work */
 uint16_t  ip NO_INIT ;
-uint16_t  w  NO_INIT ;;
 
 /* sram */
 uint8_t c NO_INIT;
 uint8_t ram[RAM_SIZE] NO_INIT;
 
-#define ppush()    psp--; psp[0] = n; n = t;    
+/* must choose better names */
 
-#define ppull()    t = n; n = psp[0]; psp++;    
+#define ROMB(X)   pgm_read_byte_near(&(rom[X]))
 
-#define TWOBYTE sizeof(uint16_t) /* 2 */
+#define ROMW(X)   pgm_read_word_near(&(rom[X]))
 
-#define ONEBYTE sizeof(uint8_t)  /* 1 */
+#define RAMW(X)   *((uint16_t *)(ram + (X)))
+
+#define ppush()   psp--; RAMW(psp) = n; n = t;    
+
+#define ppull()   t = n; n = RAMW(psp); psp++;    
 
 #define F_IMMEDIATE (0x80)
 
@@ -172,166 +140,243 @@ uint8_t ram[RAM_SIZE] NO_INIT;
 
 #define M_SIZEWORD (0x1F)
 
+#define V_FALSE (0x00)
+
+#define V_TRUE (0xFF)
+
+#define V_TWOBYTE sizeof(uint16_t) /* 2 */
+
+#define V_ONEBYTE sizeof(uint8_t)  /* 1 */
+
 /* 
  *  from avr-gcc, arduino files 
  *  always 9600,8,N,1 
  *  specs for ATmega8
  * 
  * http://ww1.microchip.com/downloads/en/AppNotes/TB3216-Getting-Started-with-USART-90003216A.pdf
+ * std: #define USART_BAUD  (((F_CPU/BAUD)/16UL)-1) 
+ *  official 51 gives about 2% error for 9600
  */
 
 #define F_CPU 8000000
 #define BAUD  9600
-
-#define USART_BAUD  (((F_CPU/BAUD)/16UL)-1) /* official 51 gives about 2% error for 9600*/
 #define USART_BAUD  (((F_CPU/BAUD)/16UL))   /* overwise 52 gives about 0% error for 9600 */
 
 /* virtual cpu opcodes */
 
 enum opcodes  {     
-    NOOP=0, THIS, CODE, 
-    NEXT, NEST, UNNEST, 
-    JUMP, JUMPNZ,
+
+    NOOP=0, CODE,
+
+    /* NEXT, NEST, UNNEST, */
+    
+    EXEC, EXIT,
+
+    JUMP, JUMPNZ, 
+    
+    THIS, COMMA,
+
     RTP, R2P, P2R, 
-    DUPNZ, DUP, DROP, SWAP, OVER, ROT, DROP2, DUP2, 
+
+    RPG, RPP, SPG, SPP,
+    
+    DUPNZ, DUP, DROP, SWAP, OVER, ROT, 
+
+	DROP2, DUP2, 
+
     CSTORE, CFETCH, STORE, FETCH, 
+
     CMOVE, CCOMP, MOVE, COMP,
+
     EQZ, LTZ, GTZ, 
+
     AND, OR, XOR, INV, CPL, SHL, SHR, 
+
+	RND, HSH,  
+   
     RXQU, RXCU, TXCU, IOSU,
 
-	CELL, FALSE, TRUE, PAD, TIB, BL,
+    CELL, FALSE, TRUE, 
 
-	PAD0, PAD1, TIB0, PSP0, RSP0,
+    BL, BS, LF, CR, ESC, 
 
-	PSPP, RSPP, BASE, SPAM, CSP, HOLD, CONTEXT, CURRENT, TOIN, LAST, NP, CP,
+    PAD0, PAD1, TIB0, PSP0, RSP0,
 
-    ZERO, ONE, SOT, EOT, LF, FF, DLE, CAN, ESC, BS, CR
+    PSPP, RSPP, BASE, SPAM, HOLD, 
+
+    STATE, CONTEXT, CURRENT, CURSOR, 
+
+    LAST, DP, UP, LASTF, DPF,
+
+    ZERO, ONE, SOT, EOT, 
+
+    COLD, ABORT, QUIT, BYE
 
     };
 
 
 void main ( void ) __attribute__((noreturn)); 
 
+
 void main (void ) {
 
+BYE:
+    /* just do a cold boot */
 
-/* leave STACK_SIZE ram for real SP, for sake, all stack grows downwards */
-
-    rsp = (uint16_t *) &(ram[RSP_TOP]);
-
-    psp = (uint16_t *) &(ram[PSP_TOP]);
-
+COLD:
+    
     ip = 0;
+
+ABORT:
+    psp = PSP_TOP;
+
+QUIT:
+    rsp = RSP_TOP;
+
+/* 
+    must:
+     set state to 0 to interpret 
+     set tibN offset to 0 start of terminal buffer 
+     set rdyN offset to 0 start of search words at TIB
+     
+*/
+    
+    goto CODE;
+
+TWIG:  /* opcodes */
+    goto TWIG;
+
+EXIT: /*  as a return */
+    ip = RAMW(rsp); rsp++;
+
+EXEC: /* as a call  */
+    w = ROMW(ip);  
+    ip += V_TWOBYTE;
+    rsp--; RAMW(rsp) = ip;
+    ip = w;         /* real magic done here */ 
 
 CODE:
 
 /* bytecodes */
 
- c = pgm_read_byte_near( &(rom[ip]) );
+    c = ROMB(ip);
 
- ip += ONEBYTE;
+     ip += V_ONEBYTE;
 
- switch (c) {
+uCV: /* virtual processor */
 
- case NOOP : goto CODE;
+     switch (c) {
 
-/* interpreter */
- case THIS : goto THIS ;
- case NEXT : goto NEXT ;
- case NEST : goto NEST ; 
- case UNNEST : goto UNNEST ; 
- case JUMP : goto JUMP ;
- case JUMPNZ : goto JUMPNZ ;
+        case NOOP : goto CODE;
+        case CODE : goto CODE;
+
+        case EXIT:    goto EXIT ;
+        case EXEC: goto EXEC ;
+        case JUMP : goto JUMP ;
+        case JUMPNZ : goto JUMPNZ ;
+
+        case THIS : goto THIS ;
+        case COMMA : goto COMMA ;
 
 /* using both stacks */
- case RTP : goto RTP ; 
- case R2P : goto R2P ; 
- case P2R : goto P2R ;
+        case RTP : goto RTP ; 
+        case R2P : goto R2P ; 
+        case P2R : goto P2R ;
 
 /* using parameter stack */
- case DUPNZ : goto DUPNZ ; 
- case DUP : goto DUP ; 
- case DROP : goto DROP ; 
- case SWAP : goto SWAP ; 
- case OVER : goto OVER ;
- case ROT : goto ROT ;
- case DROP2 : goto DROP2 ;
- case DUP2 : goto DUP2 ;
+        case DUPNZ : goto DUPNZ ; 
+        case DUP : goto DUP ; 
+        case DROP : goto DROP ; 
+        case SWAP : goto SWAP ; 
+        case OVER : goto OVER ;
+        case ROT : goto ROT ;
+        case DROP2 : goto DROP2 ;
+        case DUP2 : goto DUP2 ;
 
 /* moving */
- case STORE: goto STORE ;
- case FETCH: goto FETCH ;
- case CSTORE: goto CSTORE ;
- case CFETCH: goto CFETCH ;
- case CMOVE: goto CMOVE ; 
- case CCOMP: goto CCOMP ; 
- case MOVE: goto MOVE ; 
- case COMP: goto COMP ; 
+        case STORE: goto STORE ;
+        case FETCH: goto FETCH ;
+        case CSTORE: goto CSTORE ;
+        case CFETCH: goto CFETCH ;
+        case CMOVE: goto CMOVE ; 
+        case CCOMP: goto CCOMP ; 
+        case MOVE: goto MOVE ; 
+        case COMP: goto COMP ; 
 
 /* logical */
- case EQZ: goto EQZ ;
- case LTZ: goto LTZ ;
- case GTZ: goto GTZ ;
- case AND: goto AND ;
- case OR: goto OR ; 
- case XOR: goto XOR ; 
- case INV: goto INV ;
- case CPL: goto CPL ; 
- case SHL: goto SHL ;
- case SHR: goto SHR ; 
+        case EQZ: goto EQZ ;
+        case LTZ: goto LTZ ;
+        case GTZ: goto GTZ ;
+        case AND: goto AND ;
+        case OR: goto OR ; 
+        case XOR: goto XOR ; 
+        case INV: goto INV ;
+        case CPL: goto CPL ; 
+        case SHL: goto SHL ;
+        case SHR: goto SHR ; 
+
+        case RND: goto RND ;
+        case HSH: goto HSH ;
 
 /* const address */
- case PAD0: goto PAD0 ; 
- case PAD1: goto PAD1 ; 
- case TIB0: goto TIB0 ;
- case PSP0: goto PSP0 ;
- case RSP0: goto RSP0 ;
+        case PAD0: goto PAD0 ; 
+        case PAD1: goto PAD1 ; 
+        case TIB0: goto TIB0 ;
+        case PSP0: goto PSP0 ;
+        case RSP0: goto RSP0 ;
+
+    case RPG: goto     RPG ;
+    case RPP: goto  RPP ;
+    case SPG: goto  SPG ;
+    case SPP: goto  SPP ;
 
 /* variable address */
- case PSPP: goto PSPP ;
- case RSPP: goto RSPP ;
- case BASE: goto BASE ;
- case SPAM: goto SPAM ;
- case CSP: goto CSP ;
- case HOLD: goto HOLD ;
- case CONTEXT: goto CONTEXT ;
- case CURRENT: goto CURRENT ;
- case TOIN: goto TOIN ;
- case LAST: goto LAST ;
- case NP: goto NP ;
- case CP: goto CP ;
+        case PSPP: goto PSPP ;
+        case RSPP: goto RSPP ;
+        case BASE: goto BASE ;
+        case SPAM: goto SPAM ;
+        case HOLD: goto HOLD ;
+        case STATE: goto STATE ;
+        case CONTEXT: goto CONTEXT ;
+        case CURRENT: goto CURRENT ;
+        case CURSOR: goto CURSOR ;
+        case LAST: goto LAST ;
+        case DP: goto DP ;
+        case UP: goto UP ;
 
 /* usart stuff */
- case RXQU: goto RXQU ;
- case RXCU: goto RXCU ;
- case TXCU: goto TXCU ;
- case IOSU: goto IOSU ;
+        case RXQU: goto RXQU ;
+        case RXCU: goto RXCU ;
+        case TXCU: goto TXCU ;
+        case IOSU: goto IOSU ;
 
 /* standart constants */
- case CELL: goto CELL ;
- case FALSE: goto FALSE ;
- case TRUE: goto TRUE ;
- case PAD: goto PAD ;
- case TIB: goto TIB ;
- case BL: goto BL ;
+        case CELL: goto CELL ;
+        case FALSE: goto FALSE ;
+        case TRUE: goto TRUE ;
+
+/* ascii constants */ 
+        case BL: goto BL ;
+        case BS: goto BS;
+        case LF: goto LF;
+        case ESC: goto ESC;
+        case CR: goto CR;
 
 /* constants */
- case ZERO: goto ZERO;
- case ONE: goto ONE;
- case SOT: goto SOT;
- case EOT: goto EOT;
- case LF: goto LF;
- case FF: goto FF;
- case CAN: goto CAN;
- case DLE: goto DLE;
- case ESC: goto ESC;
- case BS: goto BS;
- case CR: goto CR;
+        case ZERO: goto ZERO;
+        case ONE: goto ONE;
+        case SOT: goto SOT;
+        case EOT: goto EOT;
 
-/* just init or panic */
-  default : goto CODE;
-  }
+/* just init */
+        case COLD: goto COLD ;
+        case ABORT: goto ABORT ;
+        case QUIT: goto QUIT ;
+        case BYE: goto BYE ;
+
+/* just panic */
+        default : goto CODE;
+   }
 
 IOSU:
     /* set baud rate */
@@ -364,57 +409,64 @@ RXQU:
     t = ( UCSRA & (1<<RXC) ) ;
     goto CODE;
 
-TWIG:  /* opcodes */
-    goto TWIG;
-
-NEXT:  /*  w = *ip , ip = *w , goto ???; */
-    w = pgm_read_word_near(&(rom[ip]));  
-    ip = pgm_read_word_near(&(rom[w]));
-    goto CODE;
-
-NEST: /*  docol or :s , ppush(ip), ip = w, goto NEXT; */
-    rsp--; rsp[0] = ip;
-    ip = w;         /* real magic done here */ 
-    goto NEXT;
-
-UNNEST: /*  dosem or ;s , ppull(ip), goto NEXT; */
-    ip = rsp[0]; rsp++;
-    goto NEXT;
-
-THIS:  /* push next literal word on dictionary into psp */
-    ppush();
-    t = pgm_read_word_near(&(rom[ip]));  /*  push in psp */
-    ip += CELL;
-    goto NEXT;
-
-JUMPNZ:  /*  ?branch */
-    if (t != 0) goto NEXT;
-
-JUMP:  /*  branch */
-    ip = pgm_read_word_near(&(rom[ip]));
-    goto NEXT;    
-
 /*
  *
  * opcode primitives,
  *
  */
 
-LEAF:  /*  bytecodes    */
-    goto LEAF;
+JUMPNZ:  /*  ?branch */
+    if (t != 0) goto CODE;
+
+JUMP:  /*  branch */
+    ip = ROMW(ip);
+    goto CODE;    
+
+THIS: /* push next literal word on dictionary into psp */
+    ppush();
+    t = ROMW(ip);  /*  push in psp */
+    ip += V_TWOBYTE;
+    goto CODE;
+
+COMMA: /* ERROR! dictionary is in ram! */
+    w = RAMW(w);
+    RAMW(w) = t ;
+    ppull();
+    goto CODE;
+
+VARS:
+    w = RAMW(ip);
+    ip += V_TWOBYTE;
+    goto CTES;
 
 P2R:  /*  >R */
-    rsp--; rsp[0] = t;
+    rsp--; RAMW(rsp) = t;
     goto DROP;
 
 R2P:  /*  R> */
     ppush();
-    t = rsp[0]; rsp++;
+    t = RAMW(rsp); rsp++;
     goto CODE;
 
 RTP:  /*  R@ */
     ppush(); 
-    t = rsp[0];
+    t = RAMW(rsp);
+    goto CODE;
+
+RPG:
+    w = 0;
+    goto CODE;
+
+RPP:
+    w = 0;
+    goto CODE;
+
+SPG:
+    w = 0;
+    goto CODE;
+
+SPP:
+    w = 0;
     goto CODE;
 
 DUPNZ:  /*  ( w1 -- 0 | w1 w1 ) */
@@ -429,48 +481,40 @@ DROP:  /*  ( W1 -- ) */
     goto CODE;
 
 OVER:  /*  ( w1 w2 -- w1 w2 w1 ) */
-    m = n; 
+    w = n; 
 
 CTES:
     ppush();
-    t = m;
+    t = w;
     goto CODE;
 
-VARS:
-	m = (uint16_t *)(&ram[m]);
-	goto CTES;
-
 SWAP:  /*  ( w1 w2 -- w2 w1 ) */
-    m = n;
-    n = t;
+    w = n;
     goto CTES;
 
-ROT:	/*	( w1 w2 w3 -- w2 w3 w1 ) */
-    m = psp[0];
-	psp[0] = n;
-	n = t;
-	t = m;
-	goto CODE;
+ROT:    /*    ( w1 w2 w3 -- w2 w3 w1 ) */
+    w = RAMW(psp);
+    RAMW(psp) = n;
+    n = t;
+    t = w;
+    goto CODE;
 
 DROP2:
-    t = psp[0]; psp++;
-    n = psp[0]; psp++;
+    t = RAMW(psp); psp++;
+    n = RAMW(psp); psp++;
     goto CODE;
 
 DUP2:
-    psp--; psp[0] = n;
-    psp--; psp[0] = t;
+    psp--; RAMW(psp) = n;
+    psp--; RAMW(psp) = t;
     goto CODE;
-
-SWAP2:
-	goto CODE;
 
 CFETCH: /* C@ */
     t = (uint16_t) ram[t];
     goto CODE;
 
 FETCH: /* @ */
-    t = ((uint16_t *) (&ram[t]))[0];
+    t = RAMW(t);
     goto CODE;
 
 CSTORE: /* C! */
@@ -478,30 +522,30 @@ CSTORE: /* C! */
     goto DROP2;
 
 STORE: /* ! */
-    ((uint16_t *) (&ram[t]))[0] = n;
+    RAMW(t)= n;
     goto DROP2;
-	
-CMOVE: /* ( w2 w1 n -- ) move bytes */
-    m = psp[0]; 
+    
+CMOVE: /* ( w1 w2 n -- ) move bytes */
+    w = RAMW(psp); 
     psp++;
     while (t) {
-        ram[n] = ram[m];
+        ram[n] = ram[w];
         n += 1;
-        m += 1;
+        w += 1;
         t -= 1;
         }
     goto DROP2;
 
-CCOMP: /* ( w2 w1 n -- 0 | t ) compare bytes, zero if all equal, t where differ  */
-    m = psp[0];
+CCOMP: /* ( w1 w2 n -- 0 | t ) compare bytes, zero if all equal, t where differ  */
+    w = RAMW(psp);
     psp++;
     while (t) {
-        if (ram[n] != ram[m]) break;
+        if (ram[n] != ram[w]) break;
         n += 1;
-        m += 1;
+        w += 1;
         t -= 1;
         }
-    m = t;
+    w = t;
     ppull();
     goto CTES;
 
@@ -553,29 +597,55 @@ EQZ:  /*  equal zero */
     t = ( t == 0 ) ? -1 : 0;
     goto CODE;
 
+RND: /* shiftxor pseudo random */
+    w = t;
+    w ^= w >> 13;
+    w ^= w << 7;
+    w ^= w >> 11;
+    w ^= w << 5;
+    t = w;
+    goto CODE;
+
+HSH: /* 1 byte hash ????  */
+    w = 1;
+    while (w) {
+        w--;
+        }
+    goto CODE;   
+
 /* constants */
 
 CELL:
-	m = TWOBYTE;
-	goto CTES;
+    w = V_TWOBYTE;
+    goto CTES;
 
 FALSE:
-	m = 0 ; 
-	goto CTES;
+    w = 0 ; 
+    goto CTES;
 
 TRUE:
-	m = -1 ;
-	goto CTES;
-	
-PAD:
-	goto CTES;
+    w = -1 ;
+    goto CTES;
+    
+BL:    /* 32 ASCII space */
+    w = 0x20 ;
+    goto CTES;
 
-TIB:
-	goto CTES;
+BS:   /* 8 ASCII backspace */
+    w = 0x08;
+    goto CTES;
 
-BL:
-	m = 32 ;
-	goto CTES;
+LF:   /* 10 ASCII line feed */
+    w = 0x0A;
+    goto CTES;
+
+CR:   /* 13 ASCII cariage return */
+    w = 0x0D;
+    goto CTES;
+
+ESC:  /* 27 ASCII escape */
+    w = 0x1B;
+    goto CTES;
 
 /*
  *
@@ -584,79 +654,75 @@ BL:
  */
 
 PAD0:
-	m = PAD0_TOP; 
-	goto CTES;
+    w = PAD0_TOP; 
+    goto CTES;
 
 PAD1:
-	m = PAD1_TOP;
-	goto CTES;
+    w = PAD1_TOP;
+    goto CTES;
 
 TIB0: 
-	m = TIB_TOP;
-	goto CTES;
+    w = TIB_TOP;
+    goto CTES;
 
 RSP0:
-	m = RSP_TOP;
-	goto CTES;
+    w = RSP_TOP;
+    goto CTES;
 
 PSP0:
-	m = PSP_TOP;
-	goto CTES;
+    w = PSP_TOP;
+    goto CTES;
 
 /*
-*
-* push address of forth variables in sram, 
-* offsets of ram, or indexes, 
-* need work to emule .DW in asm
-*
+*    extras
 */
-	
+    
 PSPP:
-    m = 2;
+    w = 2;
     goto VARS;
 
 RSPP:
-    m = 4;
+    w = 4;
     goto VARS;
 
 BASE:
-    m = 6;
+    w = 6;
     goto VARS;
 
 SPAM:
-    m = 8;
+    w = 8;
     goto VARS;
 
 HOLD:
-    m = 10;
+    w = 10;
+    goto VARS;
+
+STATE:
+    w = 12;
     goto VARS;
 
 CONTEXT:
-    m = 12;
+    w = 14;
     goto VARS;
 
 CURRENT:
-    m = 14;
+    w = 16;
     goto VARS;
 
-TOIN:
-    m = 16;
+CURSOR:
+    w = 18;
     goto VARS;
 
 LAST:
-    m = 18;
+    w = 20;
     goto VARS;
 
-NP:
-    m = 20;
+DP:
+    w = 22;
     goto VARS;
 
-CP:
-    m = 22;
-    goto VARS;
-
-CSP:
-    m = 24;
+UP:
+    w = 24;
     goto VARS;
 
 /*
@@ -666,53 +732,24 @@ CSP:
  */
 
 ZERO: /* 0  ASCII null */
-    m = 0x00;
+    w = 0x00;
     goto CTES;
 
 ONE:  /* 1 ASCII start of heading */
-    m = 0x01;
+    w = 0x01;
     goto CTES;
 
 SOT:  /* 2 ASCII Start of text */
-    m = 0x02;
+    w = 0x02;
     goto CTES;
 
 EOT:  /* 3 ASCII end of text */
-    m = 0x03;
-    goto CTES;
-
-BS:   /* 8 ASCII backspace */
-    m = 0x08;
-    goto CTES;
-
-LF:   /* 10 ASCII line feed */
-    m = 0x0A;
-    goto CTES;
-
-FF:   /* 12  ASCII form feed */
-    m = 0x0C;
-    goto CTES;
-
-CR:   /* 13 ASCII cariage return */
-    m = 0x0D;
-    goto CTES;
-
-DLE:  /* 16 ASCII data link escape */
-    m = 0x10;
-    goto CTES;
-
-CAN:  /* 24 ASCII cancel */
-    m = 0x18;
-    goto CTES;
-
-ESC:  /* 27 ASCII escape */
-    m = 0x1B;
+    w = 0x03;
     goto CTES;
 
 /* NEVER HERE LAND */
 
-EXIT:
-    goto EXIT;
+    goto BYE;
 
 /*
 

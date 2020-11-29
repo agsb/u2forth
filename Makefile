@@ -59,6 +59,7 @@ ASRC =
 # 0 = turn off optimization. s = optimize for size.
 # (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
 OPT = s
+OPT = 0
 
 # Debugging format.
 # Native formats for AVR-GCC's -g are stabs [default], or dwarf-2.
@@ -98,6 +99,7 @@ CFLAGS += -Wall -Wstrict-prototypes
 CFLAGS += -Wa,-adhlns=$(<:.c=.lst)
 CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
 CFLAGS += $(CSTANDARD)
+CFLAGS += -nostartfiles
 
 # Assembler flags.
 #  -Wa,...:   tell GCC to pass this to the assembler.
@@ -415,6 +417,13 @@ setfuse:
 # Include the dependency files.
 -include $(shell mkdir .dep 2>/dev/null) $(wildcard .dep/*)
 
+
+# Git stuff
+
+git:
+	sh readmeup
+	cp README.md.1 README.md
+	git push -f origin main
 
 # Listing of phony targets.
 .PHONY : all begin finish end sizebefore sizeafter gccversion \
