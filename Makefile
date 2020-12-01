@@ -427,7 +427,7 @@ setfuse:
 
 git:
 	sh readmeup
-	cp README.md.1 README.md
+	mv README.md.1 README.md
 	git push -f origin main
 
 # Listing of phony targets.
