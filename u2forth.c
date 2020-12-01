@@ -120,7 +120,7 @@ uint16_t  ip NO_INIT ;
 uint8_t c NO_INIT;
 uint8_t ram[RAM_SIZE] NO_INIT;
 
-/* must choose better names */
+/* maybe must choose better names */
 
 #define ROMB(X)   pgm_read_byte_near(&(rom[X]))
 
@@ -158,7 +158,10 @@ uint8_t ram[RAM_SIZE] NO_INIT;
  *  official 51 gives about 2% error for 9600
  */
 
+#ifndef F_CPU
 #define F_CPU 8000000
+#endif
+
 #define BAUD  9600
 #define USART_BAUD  (((F_CPU/BAUD)/16UL))   /* overwise 52 gives about 0% error for 9600 */
 
@@ -385,7 +388,7 @@ IOSU:
     /* enable Rx & Tx */
     UCSRB = (1<<RXEN)|(1<<TXEN);  
     /* config USART frame 8N1 */
-    UCSRC = (1<<URSEL)|(1<<UCSZ1)|(1<<UCSZ0);  
+    UCSRC = (1<<URSEL)|(1<<USBS)|(1<<UCSZ1)|(1<<UCSZ0);  
     /* config USART mode asynchonous */
     UCSRC |= (1<<UMSEL); 
     goto CODE;
