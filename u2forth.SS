@@ -199,14 +199,10 @@
 		lpm @0, Z+
 .endm
 
-
-#define	BITMASK(x) (x & F_MASKS)
-
 ;----------------------------------------------------------------------
 ;
-.DSEG	; start data segment (sram)
-.ORG 	0x00060
-label:	.byte	2;
+.dseg	; start data segment (sram)
+.org 	0x00060
 
 .dw	BASEE	; BASE
 .dw 0x0		; TMP
@@ -293,11 +289,11 @@ RESET: 	; Set Stack Pointer to top of RAM
 		eor r1, r1					; exclusive or, xor
 		out 0x3f, r1				; clear sreg
 ;	init real sp at end of sram
-		ldi _work_, hi(SRAM_END)
-		out sph, _work_
-		ldi _work_, lo(SRAM_END)
-		out spl, _work_
-      	sei                   		; Enable interrupts
+		ldi th, hi(SRAM_END)
+		out sph, th
+		ldi tl, lo(SRAM_END)
+		out spl, tl
+		;      	sei                   		; Enable interrupts
 ;----------------------------------------------------------------------
 ;	init instruction pointer and etc
 CODE 3, "BYE"
@@ -326,6 +322,11 @@ QUIT:
 		ldi xl, lo(PSP_TOP)
 
 
+;----------------------------------------------------------------------
+;
+;	start forth, 
+;----------------------------------------------------------------------
+;
 
 ;----------------------------------------------------------------------
 ;
@@ -373,7 +374,7 @@ WSTOIO:
 ;----------------------------------------------------------------------
 ;	ok	push a value from flash
 CODE, 4,"doLIT"
-WDOLIT:
+DOLIT:
 		pspush nl, nh
 		movw nl, tl
 		ipread tl
@@ -383,12 +384,18 @@ WDOLIT:
 ;----------------------------------------------------------------------
 ;	test index loop in rsp, if 0< exit loop else next 
 CODE, 4, "doNext"
-WDONEXT:
-
+DONEXT:
+		rspull wl, wh
+		sbiw w1, 1
+		
+		rspush wl, wh		
+WNEXT1:
+		rjump WXYZ
+		
 ;----------------------------------------------------------------------
 ;	ok	if 0 branch
 CODE, 7,"?BRANCH"
-WQBRAN:
+QBRAN:
 		or th, tl
 		movw tl, nl
 		pspull nl, nh
@@ -398,7 +405,7 @@ WQBRAN:
 ;----------------------------------------------------------------------
 ;	ok	branch
 CODE, 6,"BRANCH"
-WBRAN:
+BRAN:
 		ipread  wl
 		ipread  wh
 		movw zl, wl
@@ -407,13 +414,13 @@ WBRAN:
 ;----------------------------------------------------------------------
 ;	ok	exit	pop new ip from return stack
 CODE 4, "EXIT"
-WEXIT:
+EXIT:
 		rspull zl, zh
 
 ;----------------------------------------------------------------------
 ;	ok  enter
 CODE 5, "ENTER"
-WENTER:
+ENTER:
 		ipread wl
 		ipread wh
 		rspush zl, zh
@@ -423,7 +430,7 @@ WENTER:
 ;----------------------------------------------------------------------
 ;	ok 	2drop
 CODE 5, "2DROP"
-WTWODROP:
+TWODROP:
 		pspull tl, th
 		pspull nl, nh
 		rjmp WXYZ
@@ -431,7 +438,7 @@ WTWODROP:
 ;----------------------------------------------------------------------
 ;	ok	2dup
 CODE 4, "2DUP"
-WTWODUP:
+TWODUP:
 		pspush nl, nh
 		pspush tl, th
 		rjmp WXYZ
@@ -439,17 +446,17 @@ WTWODUP:
 ;----------------------------------------------------------------------
 ;	ok	to	
 CODE 1, "!"
-WTO:
+TO:
 		rspush xl, xh
 		movw xl, tl
 		pspush nl, nh
 		rspull xl, xh
-		rjmp W2DROP
+		rjmp TWODROP
 
 ;----------------------------------------------------------------------
 ;	ok	at
 CODE 1, "@"
-WAT:
+AT:
 		rspush xl, xh
 		movw xl, tl
 		pspull tl, th
@@ -469,7 +476,7 @@ WCAT:
 ;----------------------------------------------------------------------
 ;	ok	R@
 CODE 2, "R@"
-WRAT:
+RAT:
 		pspush nl, nh
 		movw nl, tl 
 		rspull tl, th
@@ -479,7 +486,7 @@ WRAT:
 ;----------------------------------------------------------------------
 ;	ok	R>
 CODE 2, "R>"
-WRTO:
+RTO:
 		pspush nl, nh
 		movw nl, tl 
 		pspull tl, th
@@ -488,30 +495,30 @@ WRTO:
 ;----------------------------------------------------------------------
 ;	ok	>R
 CODE 2, ">R"
-WTOR:
+TOR:
 		rspush tl, th
-		rjmp WDROP
+		rjmp DROP
 
 ;----------------------------------------------------------------------
 :	ok   RP@
 CODE 3, "RP@"
+RPAT:
 		pspush nl, nh
 		movw nl, tl
 		movm tl, rspl
 		rjmp WXYZ
-WRPAT:
 
 ;----------------------------------------------------------------------
 :   RP!
 CODE 3, "RP!"
-WRPTO:
+RPTO:
 		movm rspl, tl
-		rjmp WDROP
+		rjmp DROP
 
 ;----------------------------------------------------------------------
 ;	ok	DROP
 CODE 4, "DROP"
-WDROP:
+DROP:
 		movw tp, nl 
 		pspull nl, nh
 		rjmp WXYZ
@@ -519,7 +526,7 @@ WDROP:
 ;----------------------------------------------------------------------
 :   ok 	DUP
 CODE 3, "DUP"
-WDUP:
+DUP:
 		pspush nl, nh
 		movw tl, nl
 		rjmp WXYZ
@@ -527,7 +534,7 @@ WDUP:
 ;----------------------------------------------------------------------
 ;	ok 	SWAP
 CODE 4, "SWAP"
-WSWAP:
+SWAP:
 		movw wl, nl
 		movw nl, tl
 		move tl, wl
@@ -536,7 +543,7 @@ WSWAP:
 ;----------------------------------------------------------------------
 :   ok 	OVER
 CODE 4, "OVER"
-WOVER:
+OVER:
 		movw wl, nl
 		ppush nl, nh
 		movw nl, tl
@@ -546,7 +553,7 @@ WOVER:
 ;----------------------------------------------------------------------
 ;	ok	0<
 CODE 2,"0<"
-WZLESS:
+ZLESS:
 		tst th
 		mov tl, _zero_
 		mov th, _zero_
@@ -559,7 +566,7 @@ ISFALSE
 ;----------------------------------------------------------------------
 ;	ok	0=
 CODE 2,"0="
-WZEQU:
+ZEQU:
 		or th, tl
 		mov tl, _zero_
 		mov th, _zero_
@@ -569,31 +576,31 @@ WZEQU:
 ;----------------------------------------------------------------------
 :   ok	XOR
 CODE 3, "XOR"
-WXOR:
+XOR:
 		eor nl, tl
 		eor nh, th
-		rjump WDROP
+		rjump DROP
 		
 ;----------------------------------------------------------------------
 :   ok	AND
 CODE 3, "AND"
-WAND:
+AND:
 		and nl, tl
 		and nh, th
-		rjump WDROP
+		rjump DROP
 
 ;----------------------------------------------------------------------
 ;	ok	OR
 CODE 2, "OR"
-WOR:
+OR:
 		or  nl, tl
 		or  nh, th
-		rjump WDROP
+		rjump DROP
 
 ;----------------------------------------------------------------------
 ;	ok	INV
 CODE 3, "INV"
-WINV:
+INV:
 		com tl
 		com th
 		rjump WXYZ
@@ -601,23 +608,23 @@ WINV:
 ;----------------------------------------------------------------------
 ;	ok	NEG
 CODE 3, "NEG"
-WNEG:
+NEG:
 		neg tl
 		neg th
 		rjump WXYZ
 
 ;----------------------------------------------------------------------
 ;	ok	2*
-CODE 3, "2*"
-WSHL:
+CODE 2, "2*"
+SHL:
 		lsl tl
 		rol th
 		rjump WXYZ
 
 ;----------------------------------------------------------------------
 ;	ok	2/
-CODE 3, "2/"
-WSHR:
+CODE 2, "2/"
+SHR:
 		lsr th
 		ror tl
 		rjump WXYZ
@@ -636,7 +643,7 @@ WUPLUS:
 ;----------------------------------------------------------------------
 ;
 CODE 4, "CMOVE" ( tos from, n to, w many
-WCMOVE:
+CMOVE:
 		; WARNING No bound check
 		; tos 	source
 		; n		destination
@@ -648,10 +655,10 @@ WCMOVE:
 		; preserve psp into rsp
 		rspush xl, xh
 
-UCMOME1:
+CMOME1:
 		; decrease counter
 		sbiw wl, 1
-		brlt UCMOVE2
+		brlt CMOVE2
 
 		; read a byte
 		movw xl, tl
@@ -664,17 +671,16 @@ UCMOME1:
 		movw nl, xl
 
 		; again
-		rjmp UCMOVE1
+		rjmp CMOVE1
 
-UCMOVE2:
+CMOVE2:
 		; restore psp from rsp
 		rspull xl, xh
 
-WTHREDROP:
+THREDROP:
 		; drop arguments
 		adiw xl, 1
 		rjmp WTWODROP
-		 
 
 
 
