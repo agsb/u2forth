@@ -3,19 +3,23 @@ b32b6114-2abc-11eb-8261-1be5f55f2874 Thu, 19 Nov 2020 20:12:31 -0300
 
 ## u2forth
 
-  A forth virtual machine in C language, more one.
+  A forth virtual machine, still in C language, more one.
   
   But this one is for use into avr microcontroler ATmega8, 
   with RISC 32 8bit registers [1], Harvard model, 8 MHz internal clock, 
   4k 16bit words of FLASH, 1k 8bit bytes of SRAM and 512 8bit bytes for EEPROM.
   
-  This is a experience in progress, using avr-gcc -mmcu=atmega8 and to make a good  code for avr-asm
+  This is a experience in progress, using avr-gcc -mmcu=atmega8 and to make a code for avr-as
+  
+  Just only core primitives are composed
 
   WARNING: This C code makes abusive use of goto LABEL:
 
   The code is simply a enum, a switch, and many gotos.
   
   this is a tribute to G. H. Ting, and his books, papers and perseverance.
+  
+  SURE, this readme needs updates !
   
   __Not operational yet 11/2020__
   
@@ -49,6 +53,8 @@ b32b6114-2abc-11eb-8261-1be5f55f2874 Thu, 19 Nov 2020 20:12:31 -0300
           the twigs only contains address to words.
  
   WARNING: This C code makes abusive use of goto LABEL:
+  
+  WARNING: Goal is create a small object code from handcraft assembler for atmega8
   
   WARNING: Much code was borrowed from internet, with GPL licence, please help me to get all references. 
 
@@ -97,7 +103,7 @@ The dictionary of words follow the classic structure, but lives part in FLASH, c
 
   link, adress of previous word, as linked list;
   
-  size, size of this word, limited to 31 chars (0x1F), and flags for __IMMEDIATE (0x80), HIDDEN (0x40), RESERVED (0x20)__;
+  size, size of this word, limited to 31 chars (0x1F), and flags for __IMMEDIATE (0x80), EXCLUSIVE (0x40), HIDDEN (0x20)__;
   
   word, size characters with pad (maybe);
   
@@ -105,7 +111,7 @@ The dictionary of words follow the classic structure, but lives part in FLASH, c
   
   parameters, a set of opcodes (if leaf) or a set of address of words (if twig)
   
-As ATmega8 have only 8k bytes of FLASH then no support for compile new words into FLASH, 
+As ATmega8 have only 8k bytes of FLASH then no support for compile new words into FLASH, all goes to void.
 
 # Constants and Variables
 

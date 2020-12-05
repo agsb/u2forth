@@ -148,52 +148,70 @@
         F_HIDDE = 0x020
         F_MASKS = 0x01F
 
+;---------------------------------------------------------------------
+;
+;	default base
+;
+		BASEE = 16
 ;----------------------------------------------------------------------
 ;
 ; version information
 ;
-        vers = 1
-        ions = 0
+.equ	version, 0x0100
 
 ;----------------------------------------------------------------------
 ;
-;     define constants 
-;
-        FALSE = 0x00
-        TRUE = 0xFF
-        CELL = 0x02
-
-;----------------------------------------------------------------------
-;
-;     define ascii constants 
-;
-        BS = 8		;	^h	\b	backspace
-        TB = 9		;	^i	\t	horizontal tab
-        LF = 10		;	^j	\n	line feed
-        FF = 12		;	^l	\f	form feed
-		CR = 13		;	^m	\r	carriage return
-        ES = 27		;	^[	\e	escape
-		BL = 32		;	blank character
-
-        BASEE = 16
-
-;----------------------------------------------------------------------
-;
-; start value for reverse linked list
+; start reverse linked list
 ;
 .set	_WORD ,  0x0
 .set    _LINK ,  0x0
 
 ;----------------------------------------------------------------------
 ;
-; header of word in dictionary
+;	idents for first opcode in macros
 ;
-.macro CODE size , name 
+.equ	isNOOP, 0
+.equ	isLEAF, 1
+.equ	isTWIG, 2
+
+;----------------------------------------------------------------------
+;
+; header of word in dictionary
+;	opcode for CODE ( execute a opcode )
+;	must end with CODE :)
+;
+.macro LEAF size , name 
 .word    _LINK
 .byte    \size
 .ascii   "\name"
+.byte	 isLEAF
 .set     _LINK ,  .
 .set	 _WORD , _WORD + 1
+.endm
+
+;----------------------------------------------------------------------
+;
+; header of word in dictionary
+;	opcode for TWIG ( as colon )
+;	must end with EXIT :)
+;
+.macro TWIG size , name 
+.word    _LINK
+.byte    \size
+.ascii   "\name"
+.byte	 isTWIG
+.set     _LINK ,  .
+.set	 _WORD , _WORD + 1
+.endm
+
+;----------------------------------------------------------------------
+;
+;	must end with EXIT :)
+;
+.macro HASRAM name 
+.word	LITERAL
+.word	\name
+.word	EXIT
 .endm
 
 ;----------------------------------------------------------------------
@@ -244,63 +262,6 @@
 .endm
 
 ;----------------------------------------------------------------------
-		.global variables
-        .type   variables, @object
-        .size   variables, 37
-variables:
-.word BASEE      ; BASE
-.word TIB_TOP    ; TIB0 
-.word PAD0_TOP   ; PAD0 
-.word PAD1_TOP   ; PAD1 
-.word KEYQ       ; 'KEY?
-.word EMITQ      ; 'EMIT?
-.word EXPECT     ; 'EXPECT
-.word TAP        ; 'TAP
-.word ECHO       ; 'ECHO
-.word PROMPT     ; 'PROMPT
-.word EVAL       ; 'EVAL
-.word NUMBER     ; 'NUMBER
-.word NAME       ; 'NAME
-
-.equ	FORTH_VARIABLES_END, .
-;----------------------------------------------------------------------
-;
-.data    ; start data segment (sram)
-.org     0x00060
-TOPRAM:
-.equ     BASE , .
-.equ     TIB0 , .
-.equ     PAD0 , .
-.equ     PAD1 , .
-.equ     TKEYQ , .
-.equ     TEMITQ , .
-.equ     TEXPECT , .
-.equ     TTAP , .
-.equ     TECHO , .
-.equ     TPROMPT , .
-.equ     TEVAL , .
-.equ     TNUMBER , .
-.equ     TNAME , .
-;
-;	free 
-;
-.equ     TMP , .
-.equ     SPAN , .
-.equ     TIN , .
-.equ     TIB , .
-.equ     HLD , .
-.equ     CSP , .
-.equ     CONTEXT , .
-.equ     CURRENT , .
-.equ     CURSOR , .
-.equ     HANDLER , .
-.equ     LAST , .
-.equ     SP0 , .
-.equ     RP0 , .
-.equ     UP , .
-.equ     DP , .
-
-;----------------------------------------------------------------------
 ;
 ;        code segment, flash
 ;
@@ -313,6 +274,8 @@ main:
 ;
 ;        interrup table
 ;
+;----------------------------------------------------------------------
+
         rjmp   RESET        ; Reset Handler
         reti       ;        rjmp   EXT_INT0     ; IRQ0 Handler
         reti       ;        rjmp   EXT_INT1     ; IRQ1 Handler
@@ -334,12 +297,6 @@ main:
         reti       ;        rjmp   SPM_RDY      ; Store Program Memory Ready Handler;
 
 ;----------------------------------------------------------------------
-;
-;
-;----------------------------------------------------------------------
-        __SREG__ = 0x3f
-        __SP_H__ = 0x3e
-        __SP_L__ = 0x3d
 
 ;----------------------------------------------------------------------
 ;
@@ -348,8 +305,14 @@ main:
 ;----------------------------------------------------------------------
 
 ;----------------------------------------------------------------------
+;
 ;    init instruction pointer and etc
-CODE 5, "RESET"
+;
+        __SREG__ = 0x3f
+        __SP_H__ = 0x3e
+        __SP_L__ = 0x3d
+
+LEAF 5, "RESET"
 RESET:     
 ;    clear interrupts
         cli 
@@ -365,7 +328,7 @@ RESET:
 
 ;----------------------------------------------------------------------
 ;    init instruction pointer and etc
-CODE 3, "BYE"
+LEAF 3, "BYE"
 BYE:
 		; clear tos, sec, wrk
 
@@ -382,7 +345,7 @@ BYE:
 ;
 ;    init return stack
 ;
-CODE 5, "ABORT"
+LEAF 5, "ABORT"
 ABORT:
         ldi rsph, hi8(RSP_TOP)
         ldi rspl, lo8(RSP_TOP)
@@ -391,7 +354,7 @@ ABORT:
 ;
 ;    init parameter stack
 ;
-CODE 4, "QUIT"
+LEAF 4, "QUIT"
 QUIT:
 ;    init parameter stack
         ldi psph, hi8(PSP_TOP)
@@ -420,7 +383,7 @@ _COPY:
         
 		eor iph, iph
         eor ipl, ipl
-		rjmp WXYZ
+		rjmp CODE
 
 ;----------------------------------------------------------------------
 ;
@@ -431,18 +394,40 @@ _COPY:
 ;----------------------------------------------------------------------
 ;    trampoline for 127 primitives
 ;
-;        rjmp WXYZ
+;    order IS opcode sequence
 ;
 .align   2
 JUMPS:
-		rjmp WZYZ
+;
+;	 do not change order, hard coded in macros 
+;	opcode 0, 1, 2, 3, 4, 5, 6, 7	 
+;
+		rjmp NOOP	;	isNOOP
+		rjmp CODE	; 	isLEAF
+		rjmp ENTER	;	isTWIG
+		rjmp EXIT	;	
+		rjmp CODE	; 	reserved
+		rjmp CODE	; 	reserved
+		rjmp CODE	; 	reserved
+		rjmp CODE	; 	reserved
+
+;
+;	 could change order 
+;	opcode 8, .. 255
 
 ;---------------------------------------------------------------------
 ;
 ;    read a opcode in [ip] 
 ;
-CODE 4, "WXYZ"
-WXYZ:
+LEAF 4, "NOOP"
+NOOP:
+		rjmp CODE
+;---------------------------------------------------------------------
+;
+;    read a opcode in [ip] 
+;
+LEAF 4, "CODE"
+CODE:
 ; trampoline 
 
         lpm _work_, Z+
@@ -451,6 +436,9 @@ WXYZ:
 		
 ; offset by multiply by 2
 		lsl _work_
+		rol _zero_
+
+; take offset		
         add wl, _work_
         adc wh, _zero_
 
@@ -463,7 +451,8 @@ WXYZ:
 ;
 ;    ok    non block, test if can receive a char ( -- 0x00 | ch 0xFF )
 ;
-CODE 4, "KEY?"
+LEAF 4, "KEY?"
+KEYQ:
 RXAT:
         sbis 0xb, 7
         rjmp FFALSE
@@ -476,7 +465,8 @@ RXAT:
 ;
 ;    ok    non block, test if can send a char ( ch -- ch 0x00 | 0xFF )
 ;
-CODE 5, "EMIT?"
+LEAF 5, "EMIT?"
+EMITQ:
 TXTO:
         sbis 0xb, 5
         rjmp FFALSE
@@ -489,7 +479,7 @@ TXTO:
 ;
 ;    init usart, from avr-gcc public code, io ports as constants 
 ;
-CODE 3, "!IO"
+LEAF 3, "!IO"
 IOYO:
 		eor wl, wl 
         out 0x20, wl
@@ -503,21 +493,39 @@ IOYO:
         in wl,0x20
         ori wl,lo8(64)
         out 0x20,wl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
-;    ok    push a value from flash
-CODE 4, "doLIT"
-DOLIT:
+;    ok    push a value from flash into parameter stack
+LEAF 7, "LITERAL"
+LITERAL:
         pspush nl, nh
         movw nl, tl
         ipread tl
         ipread th
-        rjmp WXYZ
+        rjmp EXIT
+
+;----------------------------------------------------------------------
+;    ok    push a address  from sram
+LEAF 5, "doVAR"
+doVAR:
+        pspush nl, nh
+        movw nl, tl
+	; ????	
+        rjmp CODE
+
+;----------------------------------------------------------------------
+;    ok    push a value from flash
+LEAF 5, "doCON"
+doCON:
+        pspush nl, nh
+        movw nl, tl
+	; ????
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    test index loop in rsp, if 0< exit loop else next 
-CODE 4, "doNext"
+LEAF 4, "doNext"
 DONEXT:
         rspull wl, wh
         sbiw wl, 1
@@ -526,11 +534,11 @@ DONEXT:
 _DONEXT1:
 		adiw wl, 1
         rspush wl, wh        
-        rjmp WXYZ
+        rjmp CODE
         
 ;----------------------------------------------------------------------
 ;
-;	ok 	pop tos and test if less than zero, leave seg
+;	ok 	pop tos and test if less than zero, leave seg register
 ;
 TSTOP:
         movw wl, tl
@@ -541,15 +549,15 @@ TSTOP:
 
 ;----------------------------------------------------------------------
 ;    ok	if 0 branch
-CODE 7, "?BRANCH"
+LEAF 7, "?BRANCH"
 QBRANCH:
 		rcall TSTOP
         breq BRANCH
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok branch
-CODE 6, "BRANCH"
+LEAF 6, "BRANCH"
 BRANCH:
         ipread  wl
         ipread  wh
@@ -557,40 +565,40 @@ BRANCH:
 
 ;----------------------------------------------------------------------
 ;    ok exit    pop new ip from return stack
-CODE 4, "EXIT"
+LEAF 4, "EXIT"
 EXIT:
         rspull zl, zh
-        rjmp ENTER    ; not need maybe
+        ; rjmp ENTER    ; not need maybe
 ;----------------------------------------------------------------------
 ;    ok enter
-CODE 5, "ENTER"
+LEAF 5, "ENTER"
 ENTER:
         ipread wl
         ipread wh
         rspush zl, zh
 GOES:
         movw zl, wl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok 2drop
-CODE 5, "2DROP"
+LEAF 5, "2DROP"
 TWODROP:
         pspull tl, th
         pspull nl, nh
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok 2dup
-CODE 4, "2DUP"
+LEAF 4, "2DUP"
 TWODUP:
         pspush nl, nh
         pspush tl, th
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok    to 	(works only in sram)    
-CODE 1, "!"
+LEAF 1, "!"
 TO:
         rspush xl, xh
 		movw xl, tl
@@ -603,7 +611,7 @@ _TO1:
 
 ;----------------------------------------------------------------------
 ;    cstore
-CODE 1, "C!"
+LEAF 1, "C!"
 CTO:
         rspush xl, xh
 		movw xl, tl
@@ -612,7 +620,7 @@ CTO:
 
 ;----------------------------------------------------------------------
 ;    ok    at	(works only in sram)
-CODE 1, "@"
+LEAF 1, "@"
 AT:
         rspush xl, xh
         movw xl, tl
@@ -620,11 +628,11 @@ AT:
 		ld tl, x+
 _AT1:
         rspull xl, xh
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    cat
-CODE 1, "C@"
+LEAF 1, "C@"
 CAT:
         rspush xl, xh
         movw xl, tl
@@ -634,84 +642,92 @@ CAT:
 
 ;----------------------------------------------------------------------
 ;    ok    R@
-CODE 2, "R@"
+LEAF 2, "R@"
 RAT:
         pspush nl, nh
         movw nl, tl 
         rspull tl, th
         sbiw yl, 1
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok    R>
-CODE 2, "R>"
+LEAF 2, "R>"
 RTO:
         pspush nl, nh
         movw nl, tl 
-        pspull tl, th
-        rjmp WXYZ
+        rspull tl, th
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok    >R
-CODE 2, ">R"
+LEAF 2, ">R"
 TOR:
         rspush tl, th
         rjmp DROP
 
 ;----------------------------------------------------------------------
-;    ok   RDROP
-CODE 4, "RDROP"
-RDROP:
-        rspull wl, wh
-        rjmp WXYZ
-
-;----------------------------------------------------------------------
-;    ok   RP@
-CODE 3, "RP@"
-RPAT:
+;    ok   RS@
+LEAF 3, "RS@"
+RSAT:
         pspush nl, nh
         movw nl, tl
         movw tl, rspl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
-;   RP!
-CODE 3, "RP!"
-RPTO:
+;   ok	RS!
+LEAF 3, "RS!"
+RSTO:
         movw rspl, tl
         rjmp DROP
 
 ;----------------------------------------------------------------------
+;    ok   PS@
+LEAF 4, "PS@"
+PSAT:
+		movw wl, xl
+		adiw wl, 3
+		rjmp PFLAG
+
+;----------------------------------------------------------------------
+;    ok   PS!
+LEAF 4, "PS!"
+PSTO:
+        movw wl, tl
+        rjmp CODE
+
+;----------------------------------------------------------------------
 ;    ok    DROP
-CODE 4, "DROP"
+LEAF 4, "DROP"
 DROP:
         movw tl, nl 
         pspull nl, nh
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;   ok     DUP
-CODE 3, "DUP"
+LEAF 3, "DUP"
 DUP:
         pspush nl, nh
         movw tl, nl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok     SWAP
-CODE 4, "SWAP"
+LEAF 4, "SWAP"
 SWAP:
         movw wl, nl
         movw nl, tl
         movw tl, wl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;   ok     OVER
-CODE 4, "OVER"
+LEAF 4, "OVER"
 OVER:
         movw wl, nl
-
+		; rjmp PFLAG	; maybe not need
 ;
 ;    ok    push a value or a flag, to tos
 ;
@@ -719,13 +735,13 @@ PFLAG:
         pspush nl, nh
         movw nl, tl
         movw tl, wl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;
 ;    ok    push a false
 ;
-CODE 5, "FALSE"
+LEAF 5, "FALSE"
 FFALSE:
         ldi	wl, 0x00
         ldi	wh, 0x00
@@ -735,7 +751,7 @@ FFALSE:
 ;
 ;    ok    push a true
 ;
-CODE 4, "TRUE"
+LEAF 4, "TRUE"
 FTRUE:
         ldi	wl, 0xFF
         ldi	wh, 0xFF
@@ -743,7 +759,7 @@ FTRUE:
         
 ;----------------------------------------------------------------------
 ;    ok    0<
-CODE 2, "0<"
+LEAF 2, "0<"
 ZLESS:
         rcall TSTOP
         brge FFALSE
@@ -751,7 +767,7 @@ ZLESS:
 
 ;----------------------------------------------------------------------
 ;    ok    0=
-CODE 2, "0="
+LEAF 2, "0="
 ZEQU:
         rcall TSTOP
         brge FFALSE ; ????
@@ -759,7 +775,7 @@ ZEQU:
 
 ;----------------------------------------------------------------------
 ;   ok    XOR
-CODE 3, "XOR"
+LEAF 3, "XOR"
 XOR:
         eor nl, tl
         eor nh, th
@@ -767,7 +783,7 @@ XOR:
         
 ;----------------------------------------------------------------------
 ;   ok    AND
-CODE 3, "AND"
+LEAF 3, "AND"
 AND:
         and nl, tl
         and nh, th
@@ -775,7 +791,7 @@ AND:
 
 ;----------------------------------------------------------------------
 ;    ok    OR
-CODE 2, "OR"
+LEAF 2, "OR"
 OR:
         or  nl, tl
         or  nh, th
@@ -783,7 +799,7 @@ OR:
 
 ;----------------------------------------------------------------------
 ;     +
-CODE 1, "+"
+LEAF 1, "+"
 PLUS:
         add nl, tl
         adc nh, th
@@ -791,7 +807,7 @@ PLUS:
 
 ;----------------------------------------------------------------------
 ;     -
-CODE 1, "-"
+LEAF 1, "-"
 MINUS:
         sub nl, tl
         sbc nh, th
@@ -799,51 +815,53 @@ MINUS:
 
 ;----------------------------------------------------------------------
 ;    ok    INV
-CODE 3, "INV"
+LEAF 3, "INV"
 INV:
         com tl
         com th
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok    NEG
-CODE 3, "NEG"
+LEAF 3, "NEG"
 NEG:
         neg tl
         neg th
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok    2*
-CODE 2, "2*"
+LEAF 2, "2*"
 SHL:
         lsl tl
         rol th
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    ok    2/
-CODE 2, "2/"
+LEAF 2, "2/"
 SHR:
         lsr th
         ror tl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;     UM+
-CODE 3, "UM+"
+LEAF 3, "UM+"
 UPLUS:
+		; do signed plus
         add nl, tl
         adc nh, th
+		; preserve carry at tos
         eor tl, tl
         eor th, th
         rol tl
-        rjmp WXYZ
+        rjmp CODE
 
 ;----------------------------------------------------------------------
 ;    
 ;    CMOVE  copy from source++ to destination++, decrease w
-CODE 5, "CMOVE" 
+LEAF 5, "CMOVE" 
 CMOVE:
         ; WARNING No bound check
         ; tos     source
@@ -887,7 +905,7 @@ TRIDROP:
 
 ;----------------------------------------------------------------------
 ;    CMOVE>  copy from source+w to destination+w, decrease w
-CODE 5, "CMOVE>" 
+LEAF 5, "CMOVE>" 
 CMOVET:
         ; WARNING No bound check
         ; tos     source
@@ -940,20 +958,21 @@ _CMOVET2:
 ;----------------------------------------------------------------------
 ;
 ;	ok	UM/MOD
-CODE 6, "UM/MOD"
-		rjmp WXYZ
+LEAF 6, "UM/MOD"
+		rjmp CODE
+
 ;----------------------------------------------------------------------
 ;
 ;	ok	UM*
-CODE 3, "UM*"
-		rjmp WXYZ
+LEAF 3, "UM*"
+		rjmp CODE
 		
 ;----------------------------------------------------------------------
-;----------------------------------------------------------------------
 ;    ok    "D*" ( w1 w2 -- w3 w4 w5 w6 ) multiply two 16 bit
-CODE 3, "D*" 
+LEAF 3, "D*" 
 DMUL:
         rspush    xl, xh        ; preserve psp
+
 
         mul th, nh        ;Multiply high bytes AH x BH
         movw xl, r0       ;Move two-byte result into answer
@@ -982,49 +1001,296 @@ DMUL:
 
         eor r1, r1        ; keep R1 as zero
 
-        rjmp WXYZ
+        rjmp CODE
         
 
 ;----------------------------------------------------------------------
-.global roulette
-        .type   roulette, @object
-        .size   roulette, 37
-roulette:
-        .byte   0
-        .byte   32
-        .byte   15
-        .byte   19
-        .byte   4
-        .byte   21
-        .byte   2
-        .byte   25
-        .byte   17
-        .byte   34
-        .byte   6
-        .byte   27
-        .byte   13
-        .byte   36
-        .byte   11
-        .byte   30
-        .byte   8
-        .byte   23
-        .byte   10
-        .byte   5
-        .byte   24
-        .byte   16
-        .byte   33
-        .byte   1
-        .byte   20
-        .byte   14
-        .byte   31
-        .byte   9
-        .byte   22
-        .byte   18
-        .byte   29
-        .byte   7
-        .byte   28
-        .byte   12
-        .byte   35
-        .byte   3
-        .byte   26
+;
+TWIG 4, "CREATE"
+.word	EXIT
+;----------------------------------------------------------------------
+;
+TWIG 4, "VARIABLE"
+.word	LITERAL
+.word	DPP
+.word 	AT
+.word	EXIT
+
+;----------------------------------------------------------------------
+;
+;	ok  push address of "" into parameter stack
+;
+;----------------------------------------------------------------------
+TWIG 4, "BASE"
+HASRAM TBASE
+;----------------------------------------------------------------------
+TWIG 5, "'TIB0"
+HASRAM TIB0 
+;----------------------------------------------------------------------
+TWIG 5, "'PAD0"
+HASRAM TPAD0 
+;----------------------------------------------------------------------
+TWIG 5, "'PAD1"
+HASRAM TPAD1 
+;----------------------------------------------------------------------
+TWIG 5, "'KEYQ"
+HASRAM TKEYQ 
+;----------------------------------------------------------------------
+TWIG 6, "'iEMITQ"
+HASRAM TEMITQ 
+;----------------------------------------------------------------------
+TWIG 7, "'EXPECT"
+HASRAM TEXPECT 
+;----------------------------------------------------------------------
+TWIG 4, "'TAP"
+HASRAM TTAP 
+;----------------------------------------------------------------------
+TWIG 5, "'ECHO"
+HASRAM TECHO 
+;----------------------------------------------------------------------
+TWIG 7, "'PROMPT"
+HASRAM TPROMPT 
+;----------------------------------------------------------------------
+TWIG 5, "'EVAL"
+HASRAM TEVAL 
+;----------------------------------------------------------------------
+TWIG 7, "'NUMBER"
+HASRAM TNUMBER 
+;----------------------------------------------------------------------
+TWIG 5, "'NAME"
+HASRAM TNAME 
+;----------------------------------------------------------------------
+
+;----------------------------------------------------------------------
+;
+;	define base constants
+;
+		ONE	= 1
+		TWO = 2
+		SIX = 6
+		OCT = 8
+		TEN = 10
+		DUO = 12
+		HEX = 16
+
+;----------------------------------------------------------------------
+;       OCTAL		;	0	\0	null
+TWIG 3, "OCT"
+.word	LITERAL
+.byte	OCT
+.byte	NL
+.word	BASE	;	address of BASE variable
+.word	TO		;	!
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;       DECIMAL		;	0	\0	null
+TWIG 3, "DEC"
+.word	LITERAL
+.byte	TEN
+.byte	NL
+.word	BASE	;	address of BASE variable
+.word	TO		;	!
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;       HEX		;	0	\0	null
+TWIG 3, "HEX"
+.word	LITERAL
+.byte	HEX
+.byte	NL
+.word	BASE	;	address of BASE variable
+.word	TO		;	!
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;
+;     define ascii constants 
+;
+
+		NL = 0		;  	\0	null
+        BS = 8		;	^h	\b	backspace
+        TB = 9		;	^i	\t	horizontal tab
+        LF = 10		;	^j	\n	line feed
+        FF = 12		;	^l	\f	form feed
+		CR = 13		;	^m	\r	carriage return
+        ES = 27		;	^[	\e	escape
+		BL = 32		;	blank character
+
+;----------------------------------------------------------------------
+;       NL = 0		;	0	\0	null
+TWIG 2,"NL"
+.word	LITERAL
+.byte	NL
+.byte	NL
+.word	EXIT	;	exit
+		
+;----------------------------------------------------------------------
+;       BS = 8		;	^h	\b	backspace
+TWIG 2,"BS"
+.word	LITERAL
+.byte	BS
+.byte	NL
+.word	EXIT	;	exit
+		
+;----------------------------------------------------------------------
+;       TB = 9		;	^i	\t	horizontal tab
+TWIG 2,"TB"
+.word	LITERAL
+.byte	TB
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;       LF = 10		;	^j	\n	line feed
+TWIG 2,"LF"
+.word	LITERAL
+.byte	LF
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;       FF = 12		;	^l	\f	form feed
+TWIG 2,"FF"
+.word	LITERAL
+.byte	FF
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;       CR = 13		;	^m	\r	carriage return
+TWIG 2,"CR"
+.word	LITERAL
+.byte	CR
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;       ES = 27		;	^[	\e	escape
+TWIG 2,"ES"
+.word	LITERAL
+.byte	ES
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;		BL = 32		;	blank character
+TWIG 2,"BL"
+.word	LITERAL
+.byte	BL
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;		CELL = 2	;	size of a cell 
+TWIG 2,"CELL"
+.word	LITERAL
+.byte	TWO
+.byte	NL
+.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;
+;	ROULETTE	numbers
+;
+TWIG 8, "ROULETTE"
+.word	LITERAL
+.byte	37
+.byte   0
+.byte   32
+.byte   15
+.byte   19
+.byte   4
+.byte   21
+.byte   2
+.byte   25
+.byte   17
+.byte   34
+.byte   6
+.byte   27
+.byte   13
+.byte   36
+.byte   11
+.byte   30
+.byte   8
+.byte   23
+.byte   10
+.byte   5
+.byte   24
+.byte   16
+.byte   33
+.byte   1
+.byte   20
+.byte   14
+.byte   31
+.byte   9
+.byte   22
+.byte   18
+.byte   29
+.byte   7
+.byte   28
+.byte   12
+.byte   35
+.byte   3
+.byte   26
+.byte   0
+.word	EXIT	;	exit
+;----------------------------------------------------------------------
+
+
+;----------------------------------------------------------------------
+		.global variables
+        .type   variables, @object
+        .size   variables, 37
+variables:
+.word BASEE      ; BASE
+.word TIB_TOP    ; TIB0 
+.word PAD0_TOP   ; PAD0 
+.word PAD1_TOP   ; PAD1 
+.word KEYQ       ; 'KEY?
+.word EMITQ      ; 'EMIT?
+.word EXPECT     ; 'EXPECT
+.word TAP        ; 'TAP
+.word ECHO       ; 'ECHO
+.word PROMPT     ; 'PROMPT
+.word EVAL       ; 'EVAL
+.word NUMBER     ; 'NUMBER
+.word NAME       ; 'NAME
+
+.equ	FORTH_VARIABLES_END, .
+;----------------------------------------------------------------------
+;
+.data    ; start data segment (sram)
+TOPRAM:
+.equ     TBASE , .
+.equ     TTIB0 , .
+.equ     TPAD0 , .
+.equ     TPAD1 , .
+.equ     TKEYQ , .
+.equ     TEMITQ , .
+.equ     TEXPECT , .
+.equ     TTAP , .
+.equ     TECHO , .
+.equ     TPROMPT , .
+.equ     TEVAL , .
+.equ     TNUMBER , .
+.equ     TNAME , .
+;
+;	free 
+;
+.equ     TMP , .
+.equ     TIN , .
+.equ     TIB , .
+.equ     HLD , .
+.equ     CSP , .
+.equ     CONTEXT , .
+.equ     CURRENT , .
+.equ     CURSOR , .
+.equ     HANDLER , .
+.equ     SPAN , .
+.equ     LAST , .
+.equ     SP0 , .
+.equ     RP0 , .
+.equ     UP , .
+.equ     DP , .
 
