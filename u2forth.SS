@@ -24,6 +24,9 @@
  *
 */
 
+/* get some magic constants */
+#include <avr/io.h>
+
 ;----------------------------------------------------------------------
 ;
 ;    02/12/2020
@@ -46,7 +49,11 @@
 ;    
 ;    Alvaro Gomes Sobral Barcellos
 ;
-;   "The first register is always the target register !"
+;    "The first register is always the target register !"
+;
+;    .equ assign a constant value to a label
+;
+;    .set assign a variable value to a label
 ;
 ;    .rept    number \n " codes " \n .endr ; repeats "codes" number times
 ;
@@ -58,209 +65,240 @@
 
 ;----------------------------------------------------------------------
 ;
-;      assign a label as constant
+;	must use gnu cpp 
+;	use with .S (upper S) or
+;	use with -x assembler-with-cpp
 ;
-.set         SRAM_START    ,     0x100
-.set         SRAM_SIZE     ,     0x400
-.set         SRAM_END      ,     0x4FF
-.set         STACK_SIZE    ,     0x20
-.set         FALSE         ,     0x00
-.set         TRUE          ,     0xFF
-.set         CELL          ,     0x02
-.set         F_IMMED       ,     0x80
-.set         F_HIDEN       ,     0x40
-.set         F_RESER       ,     0x20
-.set         F_MASKS       ,     0x1F
+;----------------------------------------------------------------------
+; generic use
+#define         _work_    r0    
+
+; always zero
+#define         _zero_    r1    
+
+; Z instruction pointer for access sram and flash memory
+#define 		iph     r31    
+
+; Z instruction pointer for access sram and flash memory
+#define 		ipl     r30    
+
+; Y return stack pointer for access sram
+#define         rsph    r29    
+
+; Y return stack pointer for access sram
+#define         rspl    r28    
+
+; X parameter stack pointer for access sram
+#define         psph    r27    
+
+; X parameter stack pointer for access sram
+#define         pspl    r26    
+
+; fist value parameter stack
+#define         th    r21    
+
+; fist value parameter stack
+#define         tl    r20    
+
+; second value parameter stack
+#define         nh    r23    
+
+; second value parameter stack
+#define         nl    r22    
+
+; work registers
+#define         wh    r25    
+
+; work registers
+#define         wl    r24    
 
 ;----------------------------------------------------------------------
 ;
-;    .set assign a value to a label
+;      	assign stacks address
+;		for atmega8
 ;
-.set         SPP_TOP       ,     SRAM_END
-.set         RSP_TOP       ,     SPP_TOP - STACK_SIZE
-.set         PSP_TOP       ,     RSP_TOP - STACK_SIZE
+        SRAM_START = 0x060
+        SRAM_END = 0x4FF
 
 ;----------------------------------------------------------------------
 ;
-;     assign a name to a register
+;    default sizes
+        STACK_SIZE = 0x20    ;  32 bytes
+        TERMS_SIZE = 0x50    ;  80 bytes
+        BUFFER_SIZE = 0x80    ; 128 bytes
+;----------------------------------------------------------------------
 ;
-.set         __SREG__ ,  0x3f
-.set         __SP_H__ ,  0x3e
-.set         __SP_L__ ,  0x3d
-
-.set         _work_   ,  r0    ; generic use
-.set         _zero_   ,  r1    ; always zero
-
-.set         iph     ,  r31    ; Z instruction pointer for access sram and flash memory
-.set         ipl     ,  r30    ; Z instruction pointer for access sram and flash memory
-.set         rsph    ,  r29    ; Y return stack pointer for access sram
-.set         rspl    ,  r28    ; Y return stack pointer for access sram
-.set         psph    ,  r27    ; X parameter stack pointer for access sram
-.set         pspl    ,  r26    ; X parameter stack pointer for access sram
-
-.set         th    ,  r25    ; fist value parameter stack
-.set         tl    ,  r24    ; fist value parameter stack
-.set         nh    ,  r23    ; second value parameter stack
-.set         nl    ,  r22    ; second value parameter stack
-.set         wh    ,  r21    ; work registers
-.set         wl    ,  r20    ; work registers
-
-/* used in istructions as MUL */
-
-.set         R0 ,  r0
-.set         R1 ,  r1
-.set         R2 ,  r2
-.set         R3 ,  r3 
+;    grows downwards  SP = SP - 1
+        SPP_TOP = SRAM_END
+        RSP_TOP = SPP_TOP - STACK_SIZE
+        PSP_TOP = RSP_TOP - STACK_SIZE
+;----------------------------------------------------------------------
+;
+;    grows upwards PT = PT + 1
+        TIB_TOP = PSP_TOP - STACK_SIZE - TERMS_SIZE     
+        PAD0_TOP = TIB_TOP - BUFFER_SIZE     
+        PAD1_TOP = PAD0_TOP - BUFFER_SIZE      
 
 ;----------------------------------------------------------------------
 ;
-; flags for words
+;   flags for words
 ;
-.set         F_IMMED ,  0x080
-.set         F_COMPD ,  0x040
-.set         F_HIDDE ,  0x020
-.set         F_MASKS ,  0x01F
+        F_IMMED = 0x080
+        F_COMPD = 0x040
+        F_HIDDE = 0x020
+        F_MASKS = 0x01F
 
 ;----------------------------------------------------------------------
 ;
 ; version information
 ;
-.set         vers    ,  1
-.set         ions    ,  0
+        vers = 1
+        ions = 0
 
 ;----------------------------------------------------------------------
 ;
-; default values have extra last letter
+;     define constants 
 ;
-.set         BS ,  8
-.set         LF ,  10
-.set         CR ,  13
-.set         ESC ,  27
+        FALSE = 0x00
+        TRUE = 0xFF
+        CELL = 0x02
 
-.set         CELL ,  2
-.set         FALSE ,  0x0000
-.set         TRUE ,  0xFFFF
-.set         BASEE ,  16
+;----------------------------------------------------------------------
+;
+;     define ascii constants 
+;
+        BS = 8		;	^h	\b	backspace
+        TB = 9		;	^i	\t	horizontal tab
+        LF = 10		;	^j	\n	line feed
+        FF = 12		;	^l	\f	form feed
+		CR = 13		;	^m	\r	carriage return
+        ES = 27		;	^[	\e	escape
+		BL = 32		;	blank character
 
-.set         STKSZ ,  32        ; 16 words all stacks
-
-.set         SPP    ,  RAMEND    ; real stack
-.set         RSPP ,  SPP - STKSZ
-.set         PSPP ,  RSPP - STKSZ
-
-.set         TIBB ,  0x0
-.set         PAD0 ,  0x0
-.set         PAD1 ,  0x0
-.set         DPP ,  0x0
-.set         UPP ,  0x0
+        BASEE = 16
 
 ;----------------------------------------------------------------------
 ;
 ; start value for reverse linked list
 ;
-.set    _LINK,  0x0
-.set    _CODES, 0x0
+.set	_WORD ,  0x0
+.set    _LINK ,  0x0
 
 ;----------------------------------------------------------------------
 ;
 ; header of word in dictionary
 ;
-.macro CODE size, name 
-.set    _CODES, _CODES + 1
-.ascii "; count code _CODES"
-.word      _LINK
-.set     _LINK,  .
-.ascii "; this code _LINK"
+.macro CODE size , name 
+.word    _LINK
 .byte    \size
-.ascii     "\name"
+.ascii   "\name"
+.set     _LINK ,  .
+.set	 _WORD , _WORD + 1
 .endm
 
 ;----------------------------------------------------------------------
-.macro rspush low, high 
-        st -Y, \low
-        st -Y, \high
+.macro rspush low , high 
+        st -Y , \low
+        st -Y , \high
 .endm
 
 ;----------------------------------------------------------------------
-.macro rspull low, high
-        ld \high, Y+
-        ld \low, Y+
+.macro rspull low , high
+        ld \high , Y+
+        ld \low , Y+
 .endm
 
 ;----------------------------------------------------------------------
-.macro pspush low, high
-        st -X, \low
-        st -X, \high
+.macro pspush low , high
+        st -X , \low
+        st -X , \high
 .endm
 
 ;----------------------------------------------------------------------
-.macro pspull low, high
-        ld \high, X+
-        ld \low, X+
+.macro pspull low , high
+        ld \high , X+
+        ld \low , X+
 .endm
 
 ;----------------------------------------------------------------------
-.macro    peek byte, address
+.macro    peek byte , address
         .if (\address < $40) 
-            in \byte, \address
+         in \byte , \address
         .else
-            lds \byte, \address
+         lds \byte , \address
         .endif
 .endm
 
 ;----------------------------------------------------------------------
-.macro    poke byte, address
+.macro    poke byte , address
         .if (\address < $40) 
-            out \byte, \address
+         out \byte , \address
         .else
-            sts \byte, \address
+         sts \byte , \address
         .endif
 .endm
 
 ;----------------------------------------------------------------------
 .macro ipread register
-        lpm \register, Z+
+        lpm \register , Z+
 .endm
 
+;----------------------------------------------------------------------
+		.global variables
+        .type   variables, @object
+        .size   variables, 37
+variables:
+.word BASEE      ; BASE
+.word TIB_TOP    ; TIB0 
+.word PAD0_TOP   ; PAD0 
+.word PAD1_TOP   ; PAD1 
+.word KEYQ       ; 'KEY?
+.word EMITQ      ; 'EMIT?
+.word EXPECT     ; 'EXPECT
+.word TAP        ; 'TAP
+.word ECHO       ; 'ECHO
+.word PROMPT     ; 'PROMPT
+.word EVAL       ; 'EVAL
+.word NUMBER     ; 'NUMBER
+.word NAME       ; 'NAME
+
+.equ	FORTH_VARIABLES_END, .
 ;----------------------------------------------------------------------
 ;
 .data    ; start data segment (sram)
 .org     0x00060
-
-.word BASEE   ; BASE
-.word 0x0     ; TMP
-.word 0x0     ; SPAN
-.word 0x0     ; >IN
-.word 0x0     ; #TIB
-.word 0x0     ; HLD 
-.word 0x0     ; CSP
-.word 0x0     ; CONTEXT
-.word 0x0     ; CURRENT
-.word 0x0     ; CURSOR
-.word 0x0     ; HANDLER
-.word 0x0     ; LAST
-
-;----------------------------------------------------------------------
-; pointer to buffers
-.word TIBB    ; TIB0 
-.word PAD0    ; PAD0 
-.word PAD1    ; PAD1 
-.word 0x0     ; DP
-.word 0x0     ; UP
-.word 0x0     ; SP0
-.word 0x0     ; RP0
-
-;----------------------------------------------------------------------
-; pointers to words
-.word 0x0        ; '?KEY
-.word 0x0        ; 'EMIT
-.word 0x0        ; 'EXPECT
-.word 0x0        ; 'TAP
-.word 0x0        ; 'ECHO
-.word 0x0        ; 'PROMPT
-.word 0x0        ; 'EVAL
-.word 0x0        ; 'NUMBER
-.word 0x0        ; 'NAME
+TOPRAM:
+.equ     BASE , .
+.equ     TIB0 , .
+.equ     PAD0 , .
+.equ     PAD1 , .
+.equ     TKEYQ , .
+.equ     TEMITQ , .
+.equ     TEXPECT , .
+.equ     TTAP , .
+.equ     TECHO , .
+.equ     TPROMPT , .
+.equ     TEVAL , .
+.equ     TNUMBER , .
+.equ     TNAME , .
+;
+;	free 
+;
+.equ     TMP , .
+.equ     SPAN , .
+.equ     TIN , .
+.equ     TIB , .
+.equ     HLD , .
+.equ     CSP , .
+.equ     CONTEXT , .
+.equ     CURRENT , .
+.equ     CURSOR , .
+.equ     HANDLER , .
+.equ     LAST , .
+.equ     SP0 , .
+.equ     RP0 , .
+.equ     UP , .
+.equ     DP , .
 
 ;----------------------------------------------------------------------
 ;
@@ -276,47 +314,60 @@ main:
 ;        interrup table
 ;
         rjmp   RESET        ; Reset Handler
-        reti       ;          rjmp   EXT_INT0     ; IRQ0 Handler
-        reti       ;          rjmp   EXT_INT1     ; IRQ1 Handler
-        reti       ;          rjmp   TIM2_COMP    ; Timer2 Compare Handler
-        reti       ;          rjmp   TIM2_OVF     ; Timer2 Overflow Handler
-        reti       ;          rjmp   TIM1_CAPT    ; Timer1 Capture Handler
-        reti       ;          rjmp   TIM1_COMPA   ; Timer1 CompareA Handler
-        reti       ;          rjmp   TIM1_COMPB   ; Timer1 CompareB Handler
-        reti       ;          rjmp   TIM1_OVF     ; Timer1 Overflow Handler
-        reti       ;          rjmp   TIM0_OVF     ; Time_work_ Overflow Handler
-        reti       ;          rjmp   SPI_STC      ; SPI Transfer Complete Handler
-        reti       ;          rjmp   USART_RXC    ; USART RX Complete Handler
-        reti       ;          rjmp   USART_UDRE   ; UDR Empty Handler
-        reti       ;          rjmp   USART_TXC    ; USART TX Complete Handler
-        reti       ;          rjmp   ADC          ; ADC Conversion Complete Handler
-        reti       ;          rjmp   EE_RDY       ; EEPROM Ready Handler
-        reti       ;          rjmp   ANA_COMP     ; Analog Comparator Handler
-        reti       ;          rjmp   TWSI         ; Two-wire Serial Interface Handler
-        reti       ;          rjmp   SPM_RDY      ; Store Program Memory Ready Handler;
+        reti       ;        rjmp   EXT_INT0     ; IRQ0 Handler
+        reti       ;        rjmp   EXT_INT1     ; IRQ1 Handler
+        reti       ;        rjmp   TIM2_COMP    ; Timer2 Compare Handler
+        reti       ;        rjmp   TIM2_OVF     ; Timer2 Overflow Handler
+        reti       ;        rjmp   TIM1_CAPT    ; Timer1 Capture Handler
+        reti       ;        rjmp   TIM1_COMPA   ; Timer1 CompareA Handler
+        reti       ;        rjmp   TIM1_COMPB   ; Timer1 CompareB Handler
+        reti       ;        rjmp   TIM1_OVF     ; Timer1 Overflow Handler
+        reti       ;        rjmp   TIM0_OVF     ; Time_work_ Overflow Handler
+        reti       ;        rjmp   SPI_STC      ; SPI Transfer Complete Handler
+        reti       ;        rjmp   USART_RXC    ; USART RX Complete Handler
+        reti       ;        rjmp   USART_UDRE   ; UDR Empty Handler
+        reti       ;        rjmp   USART_TXC    ; USART TX Complete Handler
+        reti       ;        rjmp   ADC         ; ADC Conversion Complete Handler
+        reti       ;        rjmp   EE_RDY       ; EEPROM Ready Handler
+        reti       ;        rjmp   ANA_COMP     ; Analog Comparator Handler
+        reti       ;        rjmp   TWSI        ; Two-wire Serial Interface Handler
+        reti       ;        rjmp   SPM_RDY      ; Store Program Memory Ready Handler;
 
 ;----------------------------------------------------------------------
+;
+;
+;----------------------------------------------------------------------
+        __SREG__ = 0x3f
+        __SP_H__ = 0x3e
+        __SP_L__ = 0x3d
+
 ;----------------------------------------------------------------------
 ;
-RESET:     ; Set Stack Pointer to top of RAM
+; start of dictionary
+;
+;----------------------------------------------------------------------
+
+;----------------------------------------------------------------------
+;    init instruction pointer and etc
+CODE 5, "RESET"
+RESET:     
 ;    clear interrupts
         cli 
 ;    init r1 as zero
-        eor r1, r1                  ; exclusive or, xor
-        out 0x3f, r1                ; clear sreg
+        eor r1, r1               ; exclusive or, xor
+        out __SREG__, r1         ; clear sreg
 ;    init real sp at end of sram
-        ldi r25, hi8(SPP)
-        out sph, r25
-        ldi r24, lo8(SPP)
-        out spl, r24
-        ;          sei                           ; Enable interrupts
+        ldi wh, hi8(SPP_TOP)
+        out __SP_H__, wh
+        ldi wl, lo8(SPP_TOP)
+        out __SP_L__, wl
+        ;        sei                        ; Enable interrupts
+
 ;----------------------------------------------------------------------
 ;    init instruction pointer and etc
 CODE 3, "BYE"
 BYE:
-        ; must point to real start
-        eor iph, iph
-        eor ipl, ipl
+		; clear tos, sec, wrk
 
         eor th, th
         eor tl, tl
@@ -333,18 +384,43 @@ BYE:
 ;
 CODE 5, "ABORT"
 ABORT:
-        ldi yh, hi8(RSP_TOP)
-        ldi yl, lo8(RSP_TOP)
+        ldi rsph, hi8(RSP_TOP)
+        ldi rspl, lo8(RSP_TOP)
 
 ;----------------------------------------------------------------------
 ;
-;    init parameter stack and variables
+;    init parameter stack
 ;
 CODE 4, "QUIT"
 QUIT:
 ;    init parameter stack
-        ldi xh, hi8(PSP_TOP)
-        ldi xl, lo8(PSP_TOP)
+        ldi psph, hi8(PSP_TOP)
+        ldi pspl, lo8(PSP_TOP)
+
+;----------------------------------------------------------------------
+;
+;    init variables
+;
+		rspush pspl, psph
+
+		ldi zh, hi8(variables)
+		ldi zl, lo8(variables)
+		ldi xh, hi8(TOPRAM)
+		ldi xl, lo8(TOPRAM)
+		; ???? size in wl,wh
+_COPY:		
+		ld _work_, Z+
+		st X+, _work_
+        sbiw wl, 1
+        brge _COPY
+		
+		rspull pspl, psph
+		
+        ; must point to real start
+        
+		eor iph, iph
+        eor ipl, ipl
+		rjmp WXYZ
 
 ;----------------------------------------------------------------------
 ;
@@ -353,18 +429,13 @@ QUIT:
 
 
 ;----------------------------------------------------------------------
+;    trampoline for 127 primitives
 ;
-; start of dictionary
+;        rjmp WXYZ
 ;
-;----------------------------------------------------------------------
-
-
-;---------------------------------------------------------------------
-;
-;        rjmp to opcode 
-.align
-.equ    trampoline, .
-        rjmp  DUP
+.align   2
+JUMPS:
+		rjmp WZYZ
 
 ;---------------------------------------------------------------------
 ;
@@ -375,51 +446,22 @@ WXYZ:
 ; trampoline 
 
         lpm _work_, Z+
-        ; ????????
-        ;ldiw wl, trampoline
+        ldi wl, lo8(JUMPS)
+		ldi wh, hi8(JUMPS)
+		
+; offset by multiply by 2
+		lsl _work_
         add wl, _work_
         adc wh, _zero_
+
+; pseudo 
         push wl
         push wh
         ret
-        ; rjmp WHERETO
-
-;----------------------------------------------------------------------
-;    trampoline for 254 primitives
-;
-;        rjmp WXYZ
-;----------------------------------------------------------------------
-;
 
 ;----------------------------------------------------------------------
 ;
-;    ok    push a flag, FALSE or TRUE, to tos
-;
-
-;----------------------------------------------------------------------
-;
-;    ok    false
-;
-CODE 5, "FALSE"
-FFALSE:
-        clr wl
-        clr wh
-        rjmp PFLAG
-        
-;----------------------------------------------------------------------
-;
-;    ok    true
-;
-CODE 4, "TRUE"
-FTRUE:
-        ser wl
-        ser wh
-        rjmp PFLAG
-        
-;----------------------------------------------------------------------
-;----------------------------------------------------------------------
-;
-;    ok    non block, receive char and put true or if none put false
+;    ok    non block, test if can receive a char ( -- 0x00 | ch 0xFF )
 ;
 CODE 4, "KEY?"
 RXAT:
@@ -432,36 +474,35 @@ RXAT:
 
 ;----------------------------------------------------------------------
 ;
-;    send char to tx usart
+;    ok    non block, test if can send a char ( ch -- ch 0x00 | 0xFF )
 ;
 CODE 5, "EMIT?"
 TXTO:
-        sbis 0xb,5
+        sbis 0xb, 5
         rjmp FFALSE
         out 0xc, tl
-        movw tl, nl
+        movw wl, nl
         pspull nl, nh
         rjmp FTRUE
 
 ;----------------------------------------------------------------------
 ;
-;    init usart, from avr-gcc public code, constants 
+;    init usart, from avr-gcc public code, io ports as constants 
 ;
 CODE 3, "!IO"
 IOYO:
-        movw wl, tl
-        out 0x20,__zero_reg__
-        ldi tl,lo8(52)
-        out 0x9,tl
-        in tl,0xa
-        ori tl,lo8(24)
-        out 0xa,tl
-        ldi tl,lo8(-114)
-        out 0x20,tl
-        in tl,0x20
-        ori tl,lo8(64)
-        out 0x20,tl
-        movw tl, wl
+		eor wl, wl 
+        out 0x20, wl
+        ldi wl,lo8(52)
+        out 0x9,wl
+        in wl,0xa
+        ori wl,lo8(24)
+        out 0xa,wl
+        ldi wl,lo8(-114)
+        out 0x20,wl
+        in wl,0x20
+        ori wl,lo8(64)
+        out 0x20,wl
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
@@ -479,41 +520,49 @@ DOLIT:
 CODE 4, "doNext"
 DONEXT:
         rspull wl, wh
-        subi wl, 1
-        sbci wh, 0
-        brge DONEXt1
-		; ??????? 
+        sbiw wl, 1
+        brge _DONEXT1	; ????
+		rjmp EXIT		
+_DONEXT1:
+		adiw wl, 1
         rspush wl, wh        
-WNEXT1:
         rjmp WXYZ
         
 ;----------------------------------------------------------------------
-;    ok    if 0 branch
-CODE 7, "?BRANCH"
-QBRAN:
+;
+;	ok 	pop tos and test if less than zero, leave seg
+;
+TSTOP:
         movw wl, tl
         movw tl, nl
         pspull nl, nh
 		sbiw wl, 1
-        breq WBRAN
+		ret
+
+;----------------------------------------------------------------------
+;    ok	if 0 branch
+CODE 7, "?BRANCH"
+QBRANCH:
+		rcall TSTOP
+        breq BRANCH
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
-;    ok    branch
+;    ok branch
 CODE 6, "BRANCH"
-BRAN:
+BRANCH:
         ipread  wl
         ipread  wh
         rjmp GOES
 
 ;----------------------------------------------------------------------
-;    ok    exit    pop new ip from return stack
+;    ok exit    pop new ip from return stack
 CODE 4, "EXIT"
 EXIT:
         rspull zl, zh
-		rjmp ENTER	; not need maybe
+        rjmp ENTER    ; not need maybe
 ;----------------------------------------------------------------------
-;    ok  enter
+;    ok enter
 CODE 5, "ENTER"
 ENTER:
         ipread wl
@@ -524,7 +573,7 @@ GOES:
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
-;    ok     2drop
+;    ok 2drop
 CODE 5, "2DROP"
 TWODROP:
         pspull tl, th
@@ -532,7 +581,7 @@ TWODROP:
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
-;    ok    2dup
+;    ok 2dup
 CODE 4, "2DUP"
 TWODUP:
         pspush nl, nh
@@ -540,34 +589,48 @@ TWODUP:
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
-;    ok    to    
+;    ok    to 	(works only in sram)    
 CODE 1, "!"
 TO:
         rspush xl, xh
-        movw xl, tl
+		movw xl, tl
+		st X+,	nh
+		st X+,	nl
+_TO1:
+		rspull xl, xh
         pspush nl, nh
-        rspull xl, xh
         rjmp TWODROP
-
-;----------------------------------------------------------------------
-;    ok    at
-CODE 1, "@"
-AT:
-        rspush xl, xh
-        movw xl, tl
-        pspull tl, th
-        rspull xl, xh
-        rjmp WXYZ
 
 ;----------------------------------------------------------------------
 ;    cstore
 CODE 1, "C!"
-WCTO:
+CTO:
+        rspush xl, xh
+		movw xl, tl
+		st X+,	nl
+		rjmp _TO1
+
+;----------------------------------------------------------------------
+;    ok    at	(works only in sram)
+CODE 1, "@"
+AT:
+        rspush xl, xh
+        movw xl, tl
+		ld th, x+
+		ld tl, x+
+_AT1:
+        rspull xl, xh
+        rjmp WXYZ
 
 ;----------------------------------------------------------------------
 ;    cat
 CODE 1, "C@"
-WCAT:
+CAT:
+        rspush xl, xh
+        movw xl, tl
+		ld tl, x+
+		eor th, th
+        rjmp _AT1
 
 ;----------------------------------------------------------------------
 ;    ok    R@
@@ -576,9 +639,8 @@ RAT:
         pspush nl, nh
         movw nl, tl 
         rspull tl, th
-        subi yl, 1
-        sbci yh, 0
-        rjmp WYXZ
+        sbiw yl, 1
+        rjmp WXYZ
 
 ;----------------------------------------------------------------------
 ;    ok    R>
@@ -598,8 +660,8 @@ TOR:
 
 ;----------------------------------------------------------------------
 ;    ok   RDROP
-CODE 4, "RPROP"
-RDRROP:
+CODE 4, "RDROP"
+RDROP:
         rspull wl, wh
         rjmp WXYZ
 
@@ -623,7 +685,7 @@ RPTO:
 ;    ok    DROP
 CODE 4, "DROP"
 DROP:
-        movw tp, nl 
+        movw tl, nl 
         pspull nl, nh
         rjmp WXYZ
 
@@ -651,7 +713,7 @@ OVER:
         movw wl, nl
 
 ;
-;    ok    push a flag, FALSE or TRUE, to tos
+;    ok    push a value or a flag, to tos
 ;
 PFLAG:
         pspush nl, nh
@@ -660,28 +722,40 @@ PFLAG:
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
+;
+;    ok    push a false
+;
+CODE 5, "FALSE"
+FFALSE:
+        ldi	wl, 0x00
+        ldi	wh, 0x00
+        rjmp PFLAG
+        
+;----------------------------------------------------------------------
+;
+;    ok    push a true
+;
+CODE 4, "TRUE"
+FTRUE:
+        ldi	wl, 0xFF
+        ldi	wh, 0xFF
+        rjmp PFLAG
+        
+;----------------------------------------------------------------------
 ;    ok    0<
 CODE 2, "0<"
 ZLESS:
-        tst th
-        mov tl, _zero_
-        mov th, _zero_
-        brge ISFALSE
-ISTRUE:
-        subi tl, 1
-        sbci th, 0
-ISFALSE:
-        rjmp WXYZ
+        rcall TSTOP
+        brge FFALSE
+		rjmp FTRUE
 
 ;----------------------------------------------------------------------
 ;    ok    0=
 CODE 2, "0="
 ZEQU:
-        or th, tl
-        mov tl, _zero_
-        mov th, _zero_
-        brge ISFALSE
-        rjmp ISTRUE
+        rcall TSTOP
+        brge FFALSE ; ????
+        rjmp FTRUE
 
 ;----------------------------------------------------------------------
 ;   ok    XOR
@@ -706,6 +780,22 @@ OR:
         or  nl, tl
         or  nh, th
         rjmp DROP
+
+;----------------------------------------------------------------------
+;     +
+CODE 1, "+"
+PLUS:
+        add nl, tl
+        adc nh, th
+		rjmp DROP
+
+;----------------------------------------------------------------------
+;     -
+CODE 1, "-"
+MINUS:
+        sub nl, tl
+        sbc nh, th
+		rjmp DROP
 
 ;----------------------------------------------------------------------
 ;    ok    INV
@@ -742,7 +832,7 @@ SHR:
 ;----------------------------------------------------------------------
 ;     UM+
 CODE 3, "UM+"
-WUPLUS:
+UPLUS:
         add nl, tl
         adc nh, th
         eor tl, tl
@@ -751,7 +841,8 @@ WUPLUS:
         rjmp WXYZ
 
 ;----------------------------------------------------------------------
-;    CMOVE
+;    
+;    CMOVE  copy from source++ to destination++, decrease w
 CODE 5, "CMOVE" 
 CMOVE:
         ; WARNING No bound check
@@ -765,11 +856,12 @@ CMOVE:
         ; preserve psp into rsp
         rspush xl, xh
 
-CMOME1:
+		; no offset
+
+_CMOVE1:
         ; decrease counter
-        subi wl, 1
-        sbci wh, 0
-        brlt CMOVE2
+        sbiw wl, 1
+        brlt _CMOVE2
 
         ; read a byte
         movw xl, tl
@@ -782,47 +874,113 @@ CMOME1:
         movw nl, xl
 
         ; again
-        rjmp CMOVE1
+        rjmp _CMOVE1
 
-CMOVE2:
+_CMOVE2:
         ; restore psp from rsp
         rspull xl, xh
 
-THREDROP:
+TRIDROP:
         ; drop arguments
         adiw xl, 1
-        rjmp WTWODROP
+        rjmp TWODROP
 
+;----------------------------------------------------------------------
+;    CMOVE>  copy from source+w to destination+w, decrease w
+CODE 5, "CMOVE>" 
+CMOVET:
+        ; WARNING No bound check
+        ; tos     source
+        ; n        destination
+        ; w        1 or many, 0 does nothing
+
+        ; get the counter
+        pspull wl, wh
+        
+        ; preserve psp into rsp
+        rspush xl, xh
+
+		; offset predecrements
+		
+		adiw wl, 1
+
+		add tl, wl
+		adc th, wh
+
+		add nl, wl
+		adc nh, wh
+
+		sbiw wl, 1
+
+_CMOVET1:
+
+        ; decrease counter
+        sbiw wl, 1
+        brlt _CMOVET2
+
+        ; read a byte
+        movw xl, tl
+        ld r0, -X
+        movw tl, xl
+
+        ; write a byte
+        movw xl, nl
+        st -X, r0
+        movw nl, xl
+
+        ; again
+        rjmp _CMOVET1
+
+_CMOVET2:
+        ; restore psp from rsp
+        rspull xl, xh
+
+		rjmp TRIDROP
+
+;----------------------------------------------------------------------
+;
+;	ok	UM/MOD
+CODE 6, "UM/MOD"
+		rjmp WXYZ
+;----------------------------------------------------------------------
+;
+;	ok	UM*
+CODE 3, "UM*"
+		rjmp WXYZ
+		
 ;----------------------------------------------------------------------
 ;----------------------------------------------------------------------
 ;    ok    "D*" ( w1 w2 -- w3 w4 w5 w6 ) multiply two 16 bit
 CODE 3, "D*" 
 DMUL:
-        rspush    xl, xh         ; preserve psp
+        rspush    xl, xh        ; preserve psp
 
-        clr    R2
-        mul th, nh           ;Multiply high bytes AHxBH
-        movw xl, R0          ;Move two-byte result into answer
+        mul th, nh        ;Multiply high bytes AH x BH
+        movw xl, r0       ;Move two-byte result into answer
 
-        mul tl, nl           ;Multiply low bytes ALxBL
-        movw wl, R0          ;Move two-byte result into answer
+        mul tl, nl        ;Multiply low bytes AL x BL
+        movw wl, r0       ;Move two-byte result into answer
 
-        mul th, nl           ;Multiply AHxBL
-        add wh, R0           ;Add result to answer
-        adc xl, R1           ;
-        adc xh, R2           ;Add the Carry Bit
+        clr    r2
 
-        mul nh, tl           ;Multiply BHxAL
-        add wh, R0           ;Add result to answer
-        adc xl, R1           ;
-        adc xh, R2           ;Add the Carry Bit
+        mul th, nl        ;Multiply AHxBL
+        add wh, r0        ;Add result to answer
+        adc xl, r1        ;
+        adc xh, r2        ;Add the Carry Bit
 
-        movw tl, xl          ; result to parameter stack
-        movw nl, wl          ; result to parameter stack 
-        
-        eor R1, R1           ; keep R1 as zero
+        clr    r2
 
-        rspull xl, xh        ; restore psp
+        mul nh, tl        ;Multiply BH x AL
+        add wh, r0        ;Add result to answer
+        adc xl, r1        ;
+        adc xh, r2        ;Add the Carry Bit
+
+        movw tl, xl       ; result to parameter stack
+        movw nl, wl       ; result to parameter stack 
+
+        rspull xl, xh     ; restore psp
+
+        eor r1, r1        ; keep R1 as zero
 
         rjmp WXYZ
         
