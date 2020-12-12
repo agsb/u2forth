@@ -39,13 +39,13 @@ MCU = atmega8
 # 0 = turn off optimization. s = optimize for size.
 # (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
 #OPT = 0
-OPT = s
+OPT = 0
 
 # Output format. (can be srec, ihex, binary)
 FORMAT = ihex
 
 # Target file name (without extension).
-TARGET = u2forth
+TARGET = u2f
 
 # List C source files here. (C dependencies are automatically generated.)
 SRC = $(TARGET).c
@@ -91,7 +91,7 @@ CINCS =
 #  -Wall...:     warning level
 #  -Wa,...:      tell GCC to pass this to the assembler.
 #    -adhlns...: create assembler listing
-#CFLAGS = -g$(DEBUG)
+CFLAGS = -g$(DEBUG)
 CFLAGS += -O$(OPT)
 CFLAGS += $(CDEFS) $(CINCS)
 #
@@ -115,7 +115,8 @@ CFLAGS += -nostartfiles
 #             for use in COFF files, additional information about filenames
 #             and function names needs to be present in the assembler source
 #             files -- see avr-libc docs [FIXME: not yet described there]
-ASFLAGS = -Wa,-adhlns=$(<:.S=.lst),-gstabs 
+#ASFLAGS = -Wa,-adhlns=$(<:.S=.lst),-gstabs 
+ASFLAGS = -Wa,-adhlns=$(<:.S=.lst)
 
 #Additional libraries.
 

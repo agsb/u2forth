@@ -118,6 +118,7 @@ uint16_t  ip NO_INIT ;
 
 /* sram */
 uint8_t c NO_INIT;
+
 uint8_t ram[RAM_SIZE] NO_INIT;
 
 /* maybe must choose better names */

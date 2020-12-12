@@ -1,0 +1,6 @@
+
+avr-gcc -mmcu=atmega8 --save-temps -Os -c -g -Wa,-adhlns=$1.t -o $1.o $1.S
+
+avr-objdump -xstr -D $1.o > $1.lst
+
+grep '.text:' $1.lst > zz
