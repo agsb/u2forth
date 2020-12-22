@@ -39,7 +39,7 @@
 
 .word 381, 1250		; FTBYM   ft/m            381/1250
 
-.word 18, 5		    ; MSBYKS  m/s//km/h       18/5
+.word 18, 5		    ; MSBYKS  m/s to km/h     18/5
 
 .word 37087, 3792	; GRAV    gm/s2           37087/3792
 
@@ -49,5 +49,5 @@
 
 .word 24559, 8192	; EMC2    c uni.          24559/8192
 
-.word 1228, 263		; feigenbaum constants
+.word 1228, 263		; feigenbaum constant
 

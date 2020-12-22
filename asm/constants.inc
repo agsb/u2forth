@@ -12,7 +12,30 @@
         FF = 12		;	^l	\f	form feed
 		CR = 13		;	^m	\r	carriage return
         ES = 27		;	^[	\e	escape
-		BL = 32		;	blank character
+
+		BL = 32		;	space blank character
+		QK = 34		;	" quotation mark
+		BH = 92		;	\ backslash
+		OP = 40		; 	( open
+		CP = 41		;   ) close
+/*
+: ':'
+	[		\ go into immediate mode (temporarily)
+	CHAR :		\ push the number 58 (ASCII code of colon) on the parameter stack
+	]		\ go back to compile mode
+	LITERAL		\ compile LIT 58 as the definition of ':' word
+;
+
+\ A few more character constants defined the same way as above.
+: ';' [ CHAR ; ] LITERAL ;
+: '(' [ CHAR ( ] LITERAL ;
+: ')' [ CHAR ) ] LITERAL ;
+: '"' [ CHAR " ] LITERAL ;
+: 'A' [ CHAR A ] LITERAL ;
+: '0' [ CHAR 0 ] LITERAL ;
+: '-' [ CHAR - ] LITERAL ;
+: '.' [ CHAR . ] LITERAL ;
+*/
 
 ;----------------------------------------------------------------------
 ;       NL = 0		;	0	\0	null
@@ -24,11 +47,11 @@ TWIG 2,"NL"
 		
 ;----------------------------------------------------------------------
 ;       BE = 7		;	^g	\a	bell mark
-TWIG 2,"BE"
-.word	LITERAL
-.byte	BE
-.byte	NL
-.word	EXIT	;	exit
+;TWIG 2,"BE"
+;.word	LITERAL
+;.byte	BE
+;.byte	NL
+;.word	EXIT	;	exit
 		
 ;----------------------------------------------------------------------
 ;       BS = 8		;	^h	\b	backspace
@@ -56,19 +79,19 @@ TWIG 2,"LF"
 
 ;----------------------------------------------------------------------
 ;       VT = 11		;	^v	\v	vertical tab
-TWIG 2,"VT"
-.word	LITERAL
-.byte	VT
-.byte	NL
-.word	EXIT	;	exit
+;TWIG 2,"VT"
+;.word	LITERAL
+;.byte	VT
+;.byte	NL
+;.word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
-;       FF = 12		;	^l	\f	form feed
-TWIG 2,"FF"
-.word	LITERAL
-.byte	FF
-.byte	NL
-.word	EXIT	;	exit
+;       FF = 12		;	^l	\f	form feed, Ctrl-Enter
+;TWIG 2,"FF"
+;.word	LITERAL
+;.byte	FF
+;.byte	NL
+;.word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;       CR = 13		;	^m	\r	carriage return
@@ -79,15 +102,23 @@ TWIG 2,"CR"
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
-;       ES = 27		;	^[	\e	escape
-TWIG 2,"ES"
-.word	LITERAL
-.byte	ES
-.byte	NL
-.word	EXIT	;	exit
+;       CN = 24		;	CANCEL
+;TWIG 2,"CN"
+;.word	LITERAL
+;.byte	CN
+;.byte	NL
+;.word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
-;		BL = 32		;	blank character
+;       ES = 27		;	^[	\e	escape
+;TWIG 2,"ES"
+;.word	LITERAL
+;.byte	ES
+;.byte	NL
+;.word	EXIT	;	exit
+
+;----------------------------------------------------------------------
+;		BL = 32		;	space blank character
 TWIG 2,"BL"
 .word	LITERAL
 .byte	BL
@@ -95,8 +126,9 @@ TWIG 2,"BL"
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
+;----------------------------------------------------------------------
 ;
-;	why ? just for fun
+;	why not ? just for fun
 ;
 ;	ROULETTE	37 numbers of roullete in european order
 ;
@@ -141,4 +173,4 @@ ROULETTE:
 .word   3
 .word   26
 .word	0
-
+;----------------------------------------------------------------------

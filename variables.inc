@@ -132,32 +132,33 @@ TWIG 0, "LAST"
 .org	0x0060
 variables:
 
- TIMER: .word 1		; 	16 bit counter miliseconds, linked to timer0 interrupt
+TIMER: .word 1		; 	16 bit counter miliseconds, linked to timer0 interrupt
+RANDW: .word 1		; 	16 bit seed for randow recursive
 
- HLD: .word 1		;	pointer to buffer for number convertions
- SPAN: .word 1		;	number of characters in TIB
- TIN: .word 1		; 	>IN 	next character to be interpreted in TIB
- TIH: .word 1		;	#TIB 	number of characters in TIB
- TIT: .word 1		; 	'TIB	start terminal input buffer
- BASE: .word 1		; 	base for show numbers
- CONTEXT: .word 1	;	pointer to name field of last word in dictionary
- CP: .word 1		;	pointer to top free dictionary
- UP: .word 1		; 	pointer to free user sram
- LAST: .word 1		;	pointer to name field of last word
- STATE: .word 1		;	state of $interpreter or $compiler
- 
- SP0: .word 1		; 	parameter stack
- RP0: .word 1		;	return stack
+HLD: .word 1		;	pointer to buffer for number convertions
+SPAN: .word 1		;	number of characters in TIB
+TIN: .word 1		; 	>IN 	next character to be interpreted in TIB
+TIH: .word 1		;	#TIB 	number of characters in TIB
+TIT: .word 1		; 	'TIB	start terminal input buffer
+BASE: .word 1		; 	base for show numbers
+CONTEXT: .word 1	;	pointer to name field of last word in dictionary
+CP: .word 1			;	pointer to top free dictionary
+UP: .word 1			; 	pointer to free user sram
+LAST: .word 1		;	pointer to name field of last word
+STATE: .word 1		;	state of $interpreter or $compiler
 
- TTEVAL: word 1		;	reference to eval 
- TTABORT: word 1	;	reference to abort
- TTKEYQM: word 1	;	reference to key?
- TTEMITQM: word 1	;	reference to emit?
+SP0: .word 1		; 	parameter stack
+RP0: .word 1		;	return stack
 
- CUR: .word 1		; 	current postion in TIB 
- CSP: .word 1		;
- CURRENT: .word 1	;
- HANDLER: .word 1	;
+TTEVAL: .word 1		;	reference to eval 
+TTABORT: .word 1		;	reference to abort
+TTKEYQM: .word 1		;	reference to key?
+TTEMITQM: .word 1	;	reference to emit?
+
+CUR: .word 1		; 	current postion in TIB 
+CSP: .word 1		;
+CURRENT: .word 1	;
+HANDLER: .word 1	;
 
 
 

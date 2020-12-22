@@ -1,116 +1,59 @@
 
+
 ;----------------------------------------------------------------------
-;	: VARIABLE  CREATE   0  ,  ;
-TWIG 5, "VARIABLE"
-VARIABLE:
-.word CREATE
-.word LITERAL
-.word 0x0000
-.word COMMA
-.word EXIT
+;	: VARIABLE CREATE  0 , ;
+TWIG 8, "VARIABLE"
+VARIABLE:, CREATE, LITERAL, 0x0000, COMMA, EXIT
 
 ;----------------------------------------------------------------------
 ;
 TWIG 5, "ALLOT"
-ALLOT:
-.word LITERAL
-.word CP
-.word PLUSTO
-.word EXIT
+ALLOT:, LITERAL, CP, PLUSTO, EXIT
 
 ;----------------------------------------------------------------------
 ;
 TWIG 4, "HERE"
-HERE:
-.word LITERAL
-.word CP
-.word AT
-.word EXIT
+HERE:, LITERAL, CP, AT, EXIT
 
 ;----------------------------------------------------------------------
 ;
 TWIG 3, "PAD"
-PAD:
-.word HERE
-.word LITERAL
-.word BUFFER_SIZE
-.word PLUS
-.word EXIT
+PAD:, HERE, LITERAL, BUFFER_SIZE, PLUS, EXIT
 
 ;----------------------------------------------------------------------
 ;
 TWIG 5, "COUNT"
-COUNT:
-.word DUP
-.word ONEPLUS
-.word SWAP
-.word CAT
-.word EXIT
+COUNT:, DUP, ONEPLUS, SWAP, CAT, EXIT
 
 ;----------------------------------------------------------------------
 TWIG 5, "KEY"
-KEY:
-.word KEYQM
-.word QMBRANCH
-.word KEY		
-.word EXIT	
+KEY:, KEYQM, QMBRANCH, KEY, EXIT	
 
 ;----------------------------------------------------------------------
 TWIG 5, "EMIT"
-EMIT:
-.word EMITQM
-.word QMBRANCH
-.word EMIT		
-.word EXIT	
+EMIT:, EMITQM, QMBRANCH, EMIT, EXIT	
 
 ;----------------------------------------------------------------------
 TWIG 5, "CR"
-CREMIT:
-.word CR
-.word EMIT
-.word LF
-.word EMIT
-.word EXIT		
+CREMIT:, CR, EMIT, LF, EMIT, EXIT		
 
 ;----------------------------------------------------------------------
 TWIG 5, "BL"
-BLEMIT:
-.word BL
-.word EMIT
-.word EXIT		
+BLEMIT:, BL, EMIT, EXIT		
 
 ;----------------------------------------------------------------------
 TWIG 10, "IMMEDIATE?"
-IMMEDIATEQM:
-.word LITERAL
-.word F_IMMEDIATE
-.word ZEROEQ
-.word QMBRANCH
-.word FTRUE
-.word FFALSE
-.word EXIT		
+IMMEDIATEQM:, LITERAL, F_IMMEDIATE, ZEROEQ, QMBRANCH, FTRUE, FFALSE, EXIT		
 
 ;----------------------------------------------------------------------
 ;	COMPILE?
 TWIG 8, "COMPILE?"
-COMPILEQM:
-.word LITERAL
-.word F_COMPILE
-.word ZEROEQ
-.word QMBRANCH, FTRUE
-.word FFALSE
-.word EXIT		
+COMPILEQM:, LITERAL, F_COMPILE, ZEROEQ, QMBRANCH, FTRUE, FFALSE, EXIT		
 
 ;----------------------------------------------------------------------
 ;	HIDDEN?
 TWIG 7, "HIDDEN?"
-HIDDEN:
-.word LITERAL
-.word F_HIDDEN
-.word ZEROEQ
-.word QMBRANCH, FTRUE
-.word FFALSE
-.word EXIT
+HIDDEN:, LITERAL, F_HIDDEN, ZEROEQ, QMBRANCH, FTRUE, FFALSE, EXIT
 
 
 ;----------------------------------------------------------------------
@@ -118,64 +61,26 @@ HIDDEN:
 ;	but only ASCII, not UTF-8 aka CHAR
 ;
 TWIG 5, "TYPE"
-TYPE:
-.word DUP
-.word QMBRANCH
-.word _TYPE1
-.word OVER
-.word CAT
-.word EMIT
-.word ONEMINUS
-.word SWAP
-.word ONEPLUS
-.word SWAP
-.word BRANCH
-.word DUP	
-_TYPE1:
-.word TWODROP
-.word EXIT		
+TYPE:, DUP, QMBRANCH, _TYPE1, OVER, CAT, EMIT, ONEMINUS, SWAP, ONEPLUS, SWAP, BRANCH, DUP	
+_TYPE1:, TWODROP, EXIT		
 
 ;----------------------------------------------------------------------
 ; forth2012
 ;	but only ASCII, not UTF-8 aka CHAR
 ;
 TWIG 5, "EXPECT"
-EXPECT:
-.word DUP
-.word QMBRANCH
-.word _EXPECT1
-.word OVER
-.word CAT
-.word EMIT
-.word ONEMINUS
-.word SWAP
-.word ONEPLUS
-.word SWAP
-.word BRANCH
-.word DUP	
-_EXPECT1:
-.word TWODROP
-.word EXIT		
+EXPECT:, DUP, QMBRANCH, _EXPECT1, OVER, CAT, EMIT, ONEMINUS, SWAP, ONEPLUS, SWAP, BRANCH, DUP	
+_EXPECT1:, TWODROP, EXIT		
 
 ;----------------------------------------------------------------------
 ;	ok	[	state is execute
 TWIG 1, "["		
-ISEXEC:
-.word FFALSE
-.word LITERAL
-.word STATE
-.word TO
-.word EXIT
+ISEXEC:, LITERAL, FFALSE, STATE, TO, EXIT
 
 ;----------------------------------------------------------------------
 ;	ok	]	state is compile
 TWIG 1, "]"
-ISCOMP:
-.word FTRUE
-.word LITERAL
-.word STATE
-.word TO
-.word EXIT
+ISCOMP:, LITERAL, FTRUE, STATE, TO, EXIT
 
 ;----------------------------------------------------------------------
 ;
@@ -191,33 +96,21 @@ ISCOMP:
 
 ;----------------------------------------------------------------------
 ; OCTAL		;	0	\0	null
-TWIG 3, "OCT"
-.word LITERAL
+TWIG 3, "OCT", LITERAL
 .byte	OCT
-.byte	NL
-.word BASE	;	address of BASE variable
-.word TO		;	!
-.word EXIT	;	exit
+.byte	NL, BASE	;	address of BASE variable, TO		;	!, EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ; DECIMAL		;	0	\0	null
-TWIG 3, "DEC"
-.word LITERAL
+TWIG 3, "DEC", LITERAL
 .byte	TEN
-.byte	NL
-.word BASE	;	address of BASE variable
-.word TO		;	!
-.word EXIT	;	exit
+.byte	NL, BASE	;	address of BASE variable, TO		;	!, EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ; HEX		;	0	\0	null
-TWIG 3, "HEX"
-.word LITERAL
+TWIG 3, "HEX", LITERAL
 .byte	HEX
-.byte	NL
-.word BASE	;	address of BASE variable
-.word TO		;	!
-.word EXIT	;	exit
+.byte	NL, BASE	;	address of BASE variable, TO		;	!, EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;----------------------------------------------------------------------
@@ -229,213 +122,101 @@ TWIG 3, "HEX"
 ;----------------------------------------------------------------------
 ;----------------------------------------------------------------------
 ;----------------------------------------------------------------------
-TWIG 5, "DIGIT"
-.word LITERAL
-.word 0x0009
-.word OVER
-.word LTHAN
-.word LITERAL
-.word 0x0007
-.word AND
-.word PLUS
-.word LITERAL
-.word '0'
-.word PLUS
-.word EXIT
+TWIG 5, "DIGIT", LITERAL, 0x0009, OVER, LTHAN, LITERAL, 0x0007, AND, PLUS, LITERAL, '0', PLUS, EXIT
 
 
 ;----------------------------------------------------------------------
 TWIG 2, "<#"
-BDIGS:
-.word PAD
-.word HLD
-.word TO
-.word EXIT
+BDIGS:, PAD, HLD, TO, EXIT
 
 ;----------------------------------------------------------------------
-TWIG 5, "BEGIN"
-.word IMMEDIATE
-.word HERE 
-.word EXIT
+TWIG 5, "BEGIN", IMMEDIATE, HERE , EXIT
 
 ;----------------------------------------------------------------------
-TWIG 5, "DO"
-.word IMMEDIATE
-.word POSTPONE
-.word TWOTOR
-.word HERE 
-.word EXIT
+TWIG 5, "DO", IMMEDIATE, POSTPONE, TWOTOR, HERE , EXIT
 
 ;----------------------------------------------------------------------
 TWIG 1, ":"
-COLON:
-.word ISCOMP
-.word BEGIN
-.word BL
-.word FIND
-.word DUP
-.word IF
-.word FFALSE
-.word EQUAL	
-.word IF
-.word EXECUTE
-.word STACKQ
-.word ABORT"
-.ascii	" stack empty\""
-.word ELSE
-.word COMMA
-.word THEN
-.word ELSE
+COLON:, ISCOMP, BEGIN, BL, FIND, DUP, IF, FFALSE, EQUAL	, IF, EXECUTE, STACKQ, ABORT"
+.ascii	" stack empty\"", ELSE, COMMA, THEN, ELSE
 
 
 ;----------------------------------------------------------------------
-TWIG 1, ";"
-.word POSTPONE
-.word EXIT
-.word REVEAL
-.word POSTPONE
-.word OPÊNCOL
-.word EXIT
+TWIG 1, ";", POSTPONE, EXIT, REVEAL, POSTPONE, OPÊNCOL, EXIT
 
 ;----------------------------------------------------------------------
 ;	eforth	ok 
 ;
 TWIG 5, "CATCH"
-CATCH:
-.word SPAT
-.word GTR
-.word HANDLER
-.word AT
-.word GTR
-.word RPAT
-.word HANDLER
-.word TO
-.word EXECUTE
-.word RGT
-.word HANDLER
-.word TO
-.word RGT
-.word DROP
-.word FFALSE
-.word EXIT
+CATCH:, SPAT, GTR, HANDLER, AT, GTR, RPAT, HANDLER, TO, EXECUTE, RGT, HANDLER, TO, RGT, DROP, FFALSE, EXIT
 
 ;----------------------------------------------------------------------
 ;	eforth	ok 
 ;
 TWIG 5, "THROW"
-THROW:
-.word HANDLER
-.word AT
-.word PSTO
-.word RGT
-.word HANDLER
-.word TO
-.word RGT
-.word SWAP
-.word RGT
-.word SPTO
-.word DROP
-.word RGT
-.word EXIT
+THROW:, HANDLER, AT, PSTO, RGT, HANDLER, TO, RGT, SWAP, RGT, SPTO, DROP, RGT, EXIT
 
 ;----------------------------------------------------------------------
 ;	eforth	ok 
 ;
 TWIG 1, ","
-COMMA:
-.word HERE
-.word DUP
-.word CELLPLUS
-.word CP
-.word TO
-.word TO
-.word EXIT
+COMMA:, HERE, DUP, CELLPLUS, CP, TO, TO, EXIT
 
 ;----------------------------------------------------------------------
 ;	eforth	ok 
 ;
 TWIG 1, "'"
-TICK:
-.word TOKEN
-.word NAMEQ
-.word QMBRANCH
-.word EXIT
-.word THROW
-.word EXIT
+TICK:, TOKEN, NAMEQ, QMBRANCH, EXIT, THROW, EXIT
 
 ;----------------------------------------------------------------------
 ;	eforth	ok 
 ;
 TWIG 4, "[COMPILE]"
-COMPILEMD:
-.word RGT
-.word DUP
-.word AT
-.word COMMA
-.word CELLPLUS
-.word RGT
-.word PLUSTO 
-.word EXIT
+COMPILEMD:, RGT, DUP, AT, COMMA, CELLPLUS, RGT, PLUSTO , EXIT
 
 ;----------------------------------------------------------------------
 ;	
 ;	create a word in dictionary, uses next word in TIB pointed by
 ;
-TWIG 4, "CREATE"
-.word EXIT
+TWIG 4, "CREATE", EXIT
 
 ;----------------------------------------------------------------------
 ;	
 ;	create a word in dictionary, uses next word in TIB pointed by
 ;
-TWIG 4, "DOES>"
-.word EXIT
+TWIG 4, "DOES>", EXIT
 
 ;----------------------------------------------------------------------
 ;
-TWIG 4, "CONSTANT"
-.word CREATE
-.word COMMA
-.word DOES
-.word AT
-.word EXIT
+TWIG 4, "CONSTANT", CREATE, COMMA, DOES, AT, EXIT
 
 ;----------------------------------------------------------------------
 ;
-TWIG 4, "VARIABLE"
-.word CREATE
-.word LITERAL
-.word 0x0000
-.word COMMA
-.word EXIT
+TWIG 4, "VARIABLE", CREATE, LITERAL, 0x0000, COMMA, EXIT
 
 ;-----------------------------------------------------------------
 ; eforth
 ;
 TWIG 4, "doVAR"
-doVAR:
-.word EXIT
+doVAR:, EXIT
 
 ;----------------------------------------------------------------------
 ; eforth
 ;
 TWIG 4, "doVOC"
-doVOC:
-.word EXIT
+doVOC:, EXIT
 
 ;----------------------------------------------------------------------
 ; eforth
 ;
 TWIG 4, "doUSER"
-doUSER:
-.word EXIT
+doUSER:, EXIT
 
 ;----------------------------------------------------------------------
 ; eforth
 ;
 TWIG 4, "FORTH"
-FORTH:
-.word EXIT
+FORTH:, EXIT
 
 
 

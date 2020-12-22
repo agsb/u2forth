@@ -178,20 +178,25 @@
 
 ;----------------------------------------------------------------------
 ;
-; default sizes
-        STACK_SIZE = 0x20 ; 32 bytes
-        TERMS_SIZE = 0x50 ; 80 bytes
-        BUFFER_SIZE = 0x50 ; 128 bytes
+; default sizes forth83
+		SPU_SIZE = 32
+        PSP_SIZE = 64
+		RSP_SIZE = 48
+		TIB_SIZE = 80
+		PAD_SIZE = 84
 ;----------------------------------------------------------------------
-;
 ; grows downwards ((0x3D) + 0x20) = ((0x3D) + 0x20) - 1
         SPP_TOP = SRAM_END
-        RSP_TOP = SPP_TOP - STACK_SIZE
-        PSP_TOP = RSP_TOP - STACK_SIZE
+        RSP_TOP = SPP_TOP - SPU_SIZE
+        PSP_TOP = RSP_TOP - RSP_SIZE
 ;----------------------------------------------------------------------
-;
 ; grows upwards PT = PT + 1
-        TIB_TOP = PSP_TOP - STACK_SIZE - TERMS_SIZE
+        TIB_TOP = PSP_TOP - PSP_SIZE - TIB_SIZE
+
+;----------------------------------------------------------------------
+; grows upwards PT = PT + 1
+        PAD_TOP = TIB_TOP - PAD_SIZE
+;
 ;----------------------------------------------------------------------
 ;
 ; flags for words
@@ -354,25 +359,27 @@ main:
 ;	without these instructions
 ;
 TIM0_OVF:
-
 ;	save flags and stop interrups
-		in r18, SREG
+		in R5, __SREG__
 		cli
-
-;	counter
+;	get counter
 		lds R3, TIMER
 		lds R2, TIMER+1
-		adiw	r2, 1
+; 	increase counter
+		eor	R4, R4
+		inc R4
+		add R2, R4
+		dec R4
+		adc R2, R4
+;	put counter
 		sts TIMER, R3
-		srs TIMER+1, R2
-
+		sts TIMER+1, R2
 ;	adjusts counter
-		out TCNT0H, r2
-		out TCNT0L, r3
+;		out TCNT0H, R2
+;		out TCNT0L, R3
 
 ;	load flags and return
-
-		out SREG, r18
+		out __SREG__, R5
 		sei
 		reti
 
@@ -392,6 +399,35 @@ TIM0_OVF:
 ;in r17, TCNT1H
 ;reti
 ;
+;----------------------------------------------------------------------
+EEPROM_write:
+; Wait for completion of previous write
+sbic EECR, EEWE
+rjmp EEPROM_write    	
+; Set up address (r18:r17) in address register
+out EEARH, r18
+out EEARL, r17		
+; Write data (r16) to data register
+out EEDR, r16						
+; Write logical one to EEMWE
+sbi EECR, EEMWE						
+; Start eeprom write by setting EEWE
+sbi EECR, EEWE
+ret
+;----------------------------------------------------------------------
+EEPROM_read:
+; Wait for completion of previous write
+sbic EECR, EEWE
+rjmp EEPROM_read
+; Set up address (r18:r17) in address register
+out EEARH, r18
+out EEARL, r17
+; Start eeprom read by writing EERE
+sbi EECR, EERE; 
+; Read data from data register
+in r16, EEDR
+ret
+
 ;----------------------------------------------------------------------
 ;
 ; start of dictionary
@@ -1451,19 +1487,19 @@ DSHL:
 ;
 LEAF 3, "RND"
 RND:
-;
 ;	load seed
-;
-		ldi _work_, 0x02
-		eor wrk_low, _work
-		ldi _work_, 0xA8
-		eor wrk_high, _work
+		lds wrk_low, RANDW
+		lds wrk_high, RANDW + 1
 ;
 ;	run magics
 ;
 		eor	wrk_low, wrk_high
 		swap wrk_low
 		add wrk_high, wrk_low
+;	save seed
+		sts RANDW, wrk_low
+		sts RANDW + 1, wrk_high
+;
 		rjmp PUSH
 
 ;----------------------------------------------------------------------

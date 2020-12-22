@@ -127,28 +127,38 @@ TWIG 0, "LAST"
 .word LAST
 .word EXIT
 
-
 .section .data
 .global variables
+.org	0x0060
 variables:
 
- BASE: .word 1
- TIB: .word 1
- TIN: .word 1
- CUR: .word 1
- CSP: .word 1
- CONTEXT: .word 1
- CURRENT: .word 1
- HANDLER: .word 1
- HLD: .word 1
- SPAN: .word 1
- SP0: .word 1
- RP0: .word 1
- UP: .word 1
- CP: .word 1
- STATE: .word 1
- TIMER: .word 1
- LAST: .word 1
+TIMER: .word 1		; 	16 bit counter miliseconds, linked to timer0 interrupt
+RANDW: .word 1		; 	16 bit seed for randow recursive
+
+HLD: .word 1		;	pointer to buffer for number convertions
+SPAN: .word 1		;	number of characters in TIB
+TIN: .word 1		; 	>IN 	next character to be interpreted in TIB
+TIH: .word 1		;	#TIB 	number of characters in TIB
+TIT: .word 1		; 	'TIB	start terminal input buffer
+BASE: .word 1		; 	base for show numbers
+CONTEXT: .word 1	;	pointer to name field of last word in dictionary
+CURRENT: .word 1	;	pointer to name field of last word in vocaburary
+CP: .word 1			;	pointer to top free vocabulary
+UP: .word 1			; 	pointer to free user sram
+LAST: .word 1		;	pointer to name field of last word
+STATE: .word 1		;	state of $interpreter or $compiler
+
+SP0: .word 1		; 	parameter stack
+RP0: .word 1		;	return stack
+
+TTEVAL: .word 1		;	reference to eval 
+TTABORT: .word 1	;	reference to abort
+TTKEYQM: .word 1	;	reference to key?
+TTEMITQM: .word 1	;	reference to emit?
+
+CUR: .word 1		; 	current postion in TIB 
+CSP: .word 1		;
+HANDLER: .word 1	;
 
 
 

@@ -1,0 +1,154 @@
+
+\ http://forth.org/OffeteStore/1010_SystemsGuideToFigForth.pdf
+\ Conventions
+\ n 16-bit integer
+\ u 16-bit unsigned integer
+\ d 32-bit signed double integer
+\ addr 16-bit address
+\ b 8-bit byte
+\ c 7-bit ASCII character
+\ f boolean flag.
+
+\ Table 5.  Stack Instructions Operand Keys:
+DUP         ( n - n n )                     Duplicate top of stack.
+DROP        ( n - )                         Discard top of stack.
+SWAP        ( n1 n2 - n2 n1 )               Reverse top two stack items.
+OVER        ( n1 n2 - n1 n2 n1 )            Copy second item to top.
+ROT         ( n1 n2 n3 - n2 n3 n1 )         Rotate third item to top.
+-DUP        ( n - n ? )                     Duplicate only if non-zero.
+>R          ( n - )                         Move top item to return stack.
+R>          ( - n )                         Retrieve item from return stack.
+R           ( - n )                         Copy top of return stack onto stack.
++           ( n1 n2 - sum )                 Add.
+D+          ( d1 d2 - sum )                 Add double-precision numbers.
+-           ( n1 n2 - diff )                Subtract (n1-n2).
+*           ( n1 n2 - prod )                Multiply.
+/           ( n1 n2 - quot )                Divide (n1/n2).
+MOD         ( n1 n2 - rem )                 Modulo (remainder from division).
+/MOD        ( n1 n2 - rem quot )            Divide, giving remainder and quotient.
+*/MOD       ( n1 n2 - rem quot )            Multiply, then divide (n1*n2/n3), with double-precision intermediate.
+*/          ( n1 n2 - quot )                Like */MOD, but give quotient only.
+MAX         ( n1 n2 - max )                 Maximum.
+MIN         ( n1 n2 - min )                 Minimum.
+ABS         ( n - absolute )                Absolute value.
+DABS        ( d - absolute )                Absolute value of double-precision number.
+MINUS       ( n - -n )                      Change sign.
+DMINUS      ( d - -d )                      Change sign of double-precision number.
+AND         ( n1 n2 - and )                 Logical bitwise AND.
+OR          ( n1 n2 - or )                  Logical bitwise OR.
+XOR         ( n1 n2 - xor )                 Logical bitwise exclusive OR.
+<           ( n1 n2 - f )                   True if n1 less than n2.
+>           ( n1 n2 - f )                   True if n1 greater than n2.
+=           ( n1 n2 - f )                   True if n1 equal to n2.
+0<          ( n - f )                       True if top number negative.
+0=          ( n - f )                       True if top number zero.
+\ Table 6.  Input output Instructions
+.  			 ( n - )                        Print number.
+.R           ( n u - )                      Print number, right-justified in u column.
+D.  		 ( d - )                        Print double-precision number.
+D.R          ( d u - )                      Print double-precision number in u column.
+CR           ( - )                          Do a carriage-return.
+SPACE        ( - )                          Type one space.
+SPACES       ( u - )                        Type u spaces.
+."           ( - )                          Print message (terminated by ").
+DUMP         ( addr u - )                   Dump u numbers starting at address.
+TYPE         ( addr u - )                   Type u characters starting at address.
+COUNT        ( addr - addr+1 u )            Change length byte string to TYPE form.
+?TERMINAL    ( - f )                        True if terminal break request present.
+KEY          ( - c )                        Read key, put ASCII value on stack.
+EMIT         ( c - )                        Type ASCII character from stack.
+EXPECT       ( addr u - )                   Read u characters (or until carriage-return) from input device to address.
+WORD         ( c - )                        Read one word from input stream, delimitedby c.
+NUMBER       ( addr - d )                   Convert string at address to double number.
+<#           ( - )                          Start output string.
+#            ( d1 - d2 )                    Convert one digit of double number and add character to output string.
+#S           ( d - 0 0 )                    Convert all significant digits of double number to output string.
+SIGN         ( n d - d )                    Insert sign of n to output string.
+#>           ( d - addr u )                 Terminate output string for TYPE.
+HOLD         ( c - )                        Insert ASCII character into output string.
+DECIMAL      ( - )                          Set decimal base.
+HEX          ( - )                          Set hexadecimal base.
+OCTAL        ( - )                          Set octal base.
+\ Table 7. Memory and Dictionary Instructions
+@               ( addr - n )                Replace word address by contents.
+!               ( n addr - )                Store second word at address on top.
+C@              ( addr - b )                Fetch one byte only.
+C!              ( b addr - )                Store one byte only.
+?               ( addr - )                  Print contents of address.
++!              ( n addr - )                Add second number to contents of address.
+CMOVE           ( from to u - )             Move u bytes in memory.
+FILL            ( addr u b - )              Fill u bytes in memory with b beginning at address.
+ERASE           ( addr u - )                Fill u bytes in memory with zeros.
+BLANKS          ( addr u - )                Fill u bytes in memory with blanks.
+HERE            ( - addr )                  Return address above dictionary.
+PAD             ( - addr )                  Return address of scratch area.
+ALLOT           ( u - )                     Leave a gap of n bytes in the dictionary.
+,               ( n - )                     Compile number n into the dictionary.
+'               ( - addr )                  Find address of next string in dictionary.
+FORGET          ( - )                       Delete all definitions above and including the following definition.
+DEFINITIONS     ( - )                       Set current vocabulary to context vocabulary.
+VOCABULARY      ( - )                       Create new vocabulary.
+FORTH           ( - )                       Set context vocabulary to Forth vocabulary.
+EDITOR          ( - )                       Set context vocabulary to Editor vocabulary.
+ASSEMBLER       ( - )                       Set context vocabulary to Assembler.
+VLIST           ( - )                       Print names in context vocabulary.
+\ Table 8. Defining Instructions and Control Structure Instructions
+:           ( - )                           Begin a colon definition.
+;           ( - )                           End of a colon definition.
+VARIABLE    ( n - )                         Create a variable with initial value n.  ( - addr )                      Return address when executed.
+CONSTANT    ( n - )                         Create a constant with value n.  ( - n )                         Return the value n when executed.
+CODE        ( - )                           Create assembly-language definition.
+;CODE       ( - )                           Create a new defining word, with runtime code routine in high-level Forth.
+DO          ( end+1 start - )               Set up loop, given index range.
+LOOP        ( - )                           Increment index, terminate loop if equal to limit.
++LOOP       ( n - )                         Increment index by n. Terminate loop if outside limit.
+I           ( - index )                     Place loop index on stack.
+LEAVE       ( - )                           Terminate loop at next LOOP or +LOOP.IF          ( f - )                         If top of stack is true, execute true clause.
+ELSE        ( - )                           Beginning of the false clause.
+ENDIF       ( - )                           End of the IF-ELSE structure.
+BEGIN       ( - )                           Start an indefinite loop.
+UNTIL       ( f - )                         Loop back to BEGIN until f is true.REPEAT      ( - )                           Loop back to BEGIN unconditionally.
+WHILE       ( f - )                         Exit loop immediately if f is false.
+\  Table 9.  Miscellaneous Instructions
+(           ( - )                           Begin comment, terminated by ).
+ABORT       ( - )                           Error termination of execution.
+SP@         ( - addr )                      Return address of top stack item.
+LIST        ( screen - )                    List a disk screen.
+LOAD        ( screen - )                    Load a disk screen (compile or execute).
+BLOCK       ( block - addr )                Read disk block to memory address.
+UPDATE      ( - )                           Mark last buffer accessed as updated.
+FLUSH       ( - )                           Write all updated buffers to disk.
+EMPTY-BUFFERS  ( - )                           Erase all buffers.
+\ System Constants and User Variable Some system constants defined in figForth are listed in Table 10.
+User variables are listed in Table 11.
+Most of the user variables are pointers pointing to various areas in the memory map to facilitate memory access.
+\ Table 10.  System Constants
+FIRST         3BE0H.  Address of the first byte of the disk buffers.
+LIMIT         4000H.  Address of the last byte of disk buffers plus one pointing to the free memory not used by the Forth system.,
+B/SCR         8 Blocks per screen.  In the fig-Forth model, a block is 128 bytes, the capacity of a disk sector.  A screen is 1024 bytes used in editor.
+B/BUF         128.  Bytes per buffer.
+C/L           64. Characters per line of input text.
+BL            32. ASCII blank.
+\ Table 11.  User Variables
+S0            Initial value of the data stack pointer.
+R0            Initial value of the return stack pointer.
+TIB           Address of the terminal input buffer.
+WARNING       Error message control number.  If 1, disk is present, and screen 4 of drive 0 is the base location of error messages.  If 0, no disk is present and error messages will be presented by number.  If -1, execute (ABORT) on error.
+FENCE         Address below which FORGETting is trapped. To forget below this point the user must alter the contents of FENCE .
+DP            The dictionary pointer which contains the next free memory above the dictionary.  The value may be read by HERE and altered by ALLOT .
+VOC-LINK      Address of a field in the definition of the most recently created vocabulary.  All vocabulary names are linked by these fields to allow control for FORGETing through multiple vocabularies.
+BLK           Current block number under interpretation.  If 0, input is being taken from the terminal input buffer.
+IN            Byte offset within the current input text buffer (terminal or disk) from which the next text will be accepted.  WORD uses and moves the value of IN .
+OUT           Offset in the text output buffer.  Its value is incremented by EMIT.  The user may alter and examine OUT to control output display formatting.
+SCR           Screen number most recently referenced by LIST .
+OFFSET        Block offset to disk drives. Contents of OFFSET is added to the stack number by BLOCK .
+CONTEXT       Pointer to the vocabulary within which dictionary search will first begin.
+CURRENT       Pointer to the vocabulary in which new definitions are to be added.
+STATE         If 0, the system is in interpretive or executing state. If non-zero, the system is in compiling state.  The value itself is implementation dependent.
+BASE          Current number base used for input and output numeric  conversions.
+DPL           Number of digits to the right of the decimal point on double  integer input.  It may also be used to hold output column location of a decimal point in user generated formatting.  The default value on single number input is -1.
+FLD           Field width for formatted number output.
+CSP           Temporarily stored data stack pointer for compilation error checking.
+R#            Location of editor cursor in a text screen.
+HLD           Address of the latest character of text during numeric output conversi
+

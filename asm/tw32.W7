@@ -1,0 +1,1786 @@
+
+;-----------------------------------------------------------------
+;
+; 2020, from esp32Forth_62.pdf, Chen-Hanson Ting
+;
+;-----------------------------------------------------------------
+; flags for words 
+;
+	F_IMMED=0x80 
+	F_COMPO=0x40
+	F_COMPILE=0x00
+	F_INTERPRET=0x01
+;-----------------------------------------------------------------
+;
+; KEY ( -- c ) 
+TWIG 3, "KEY" 
+KEY : 
+ .word QKEY
+ .word QBRANCH
+ .word KEY
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; WITHIN ( u ul uh -- t ) 
+TWIG 6, "WITHIN" 
+WITHI : 
+ .word OVER
+ .word SUBBB
+ .word TOR
+ .word SUBBB
+ .word RFROM
+ .word ULESS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; >CHAR ( c -- c ) 
+TWIG 5, ">CHAR" 
+TCHAR : 
+ .word DOLIT
+ .word 0x7F
+ .word ANDD
+ .word DUPP
+ .word DOLIT
+ .word 0x7F
+ .word BLANK
+ .word WITHI
+ .word QBRANCH
+ .word TCHAR_0
+ .word DROP
+ .word DOLIT
+ .word 0X5F
+TCHAR_0:
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ALIGNED ( b -- a ) 
+; ???? what is it? 
+TWIG 7, "ALIGNED" 
+ALIGN : 
+ .word DOLIT
+ .word 0x03
+ .word PLUS
+ .word DOLIT
+ .word 0XFFFFFFFC
+ .word ANDD
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; HERE ( -- a ) 
+TWIG 4, "HERE" 
+HERE : 
+ .word CP
+ .word AT
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; PAD ( -- a ) 
+TWIG 3, "PAD" 
+PAD : 
+ .word HERE
+ .word DOLIT
+ .word 0x50
+ .word PLUS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; TIB ( -- a ) 
+TWIG 3, "TIB" 
+TIB : 
+ .word TTIB
+ .word AT
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; @EXECUTE ( a -- ) 
+TWIG 8, "@EXECUTE" 
+ATEXE : 
+ .word AT
+ .word QDUP
+ .word QBRANCH 
+ .word ATEXE_0
+ .word EXECU
+ATEXE_0:
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; CMOVE ( b b u -- ) 
+TWIG 5, "CMOVE" 
+CMOVEE : 
+ CMOVEE_1FOR(0);
+ .word BRANCH
+ .word
+ .word OVER
+ .word CAT
+ .word OVER
+ .word CSTOR
+ .word TOR
+ .word ONEP
+ .word RFROM
+ .word ONEP
+ THEN(0);
+ NEXT(2, 
+ .word DDROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; MOVE ( b b u -- ) 
+TWIG 4, "MOVE" 
+MOVE : 
+ int MOVE=
+ COLON(1
+ .word CELLD);
+ FOR(0);
+ AFT(8
+ .word OVER
+ .word AT
+ .word OVER
+ .word STORE
+ .word TOR
+ .word CELLP
+ .word RFROM
+ .word CELLP);
+ THEN(0);
+ NEXT(2
+ .word DDROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; FILL ( b u c -- ) 
+TWIG 4, "FILL" 
+FILL : 
+ int FILL=
+ COLON(1
+ .word SWAP);
+ FOR(1
+ .word SWAP);
+ AFT(3
+ .word DDUP
+ .word CSTOR
+ .word ONEP);
+ THEN(0);
+ NEXT(2
+ .word DDROP
+ .word EXITT
+
+\ Number Conversions
+
+;-----------------------------------------------------------------
+;
+; DIGIT ( u -- c ) 
+TWIG 5, "DIGIT" 
+DIGIT : 
+ .word DOLIT
+ .word 0x09
+ .word OVER
+ .word LESS
+ .word DOLIT
+ .word 0x07
+ .word ANDD
+ .word PLUS
+ .word DOLIT
+ .word 0X30
+ .word PLUS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; EXTRACT ( n base -- n c ) 
+TWIG 7, "EXTRACT" 
+EXTRC : 
+ .word DOLIT
+ .word 0x00
+ .word SWAP
+ .word UMMOD
+ .word SWAP
+ .word DIGIT
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; <# ( -- ) 
+TWIG 2, "<#" 
+BDIGS : 
+ .word PAD
+ .word HLD
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; HOLD ( c -- ) 
+TWIG 4, "HOLD" 
+HOLD : 
+ .word HLD
+ .word AT
+ .word ONEM
+ .word DUPP
+ .word HLD
+ .word STORE
+ .word CSTOR
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; # (dig) ( u -- u ) 
+TWIG 1, "#" 
+DIG : 
+ .word BASE
+ .word AT
+ .word EXTRC
+ .word HOLD
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; #S (digs) ( u -- 0 ) 
+TWIG 2, "#S" 
+DIGS : 
+ int DIGS=
+ COLON(0);
+ BEGIN(2
+ .word DIG
+ .word DUPP);
+ WHILE(0);
+ REPEAT(1
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; SIGN ( n -- ) 
+TWIG 4, "SIGN" 
+SIGN : 
+ int SIGN=
+ COLON(1
+ .word ZLESS);
+ IF(3
+ .word DOLIT
+ .word 0X2D
+ .word HOLD);
+ THEN(1
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; #> ( w -- b u ) 
+TWIG 2, "#>" 
+EDIGS : 
+ .word DROP
+ .word HLD
+ .word AT
+ .word PAD
+ .word OVER
+ .word SUBBB
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; str ( n -- b u ) 
+TWIG 3, "str" 
+STRR : 
+ .word DUPP
+ .word TOR
+ .word ABSS
+ .word BDIGS
+ .word DIGS
+ .word RFROM
+ .word SIGN
+ .word EDIGS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; HEX ( -- ) 
+TWIG 3, "HEX" 
+HEXX : 
+ .word DOLIT
+ .word 0x10
+ .word BASE
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; DECIMAL ( -- ) 
+TWIG 7, "DECIMAL" 
+DECIM : 
+ .word DOLIT
+ .word 0x0A
+ .word BASE
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; wupper ( w -- w' ) 
+; ???? what is it? 
+TWIG 6, "wupper" 
+UPPER : 
+ .word DOLIT
+ .word 0x5F5F5F5F
+ .word ANDD
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; >upper ( c -- UC ) 
+TWIG 6, ">upper" 
+TOUPP : 
+ .word DUPP
+ .word DOLIT
+ .word 0x61
+ .word DOLIT
+ .word 0x7B
+ .word WITHI);
+ IF(3
+ .word DOLIT
+ .word 0x5F
+ .word ANDD);
+ THEN(1
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; DIGIT? ( c base -- u t ) 
+TWIG 6, "DIGIT?" 
+DIGTQ : 
+ int DIGTQ=
+ COLON(9
+ .word TOR
+ .word TOUPP
+ .word DOLIT
+ .word 0X30
+ .word SUBBB
+ .word DOLIT
+ .word 0x09
+ .word OVER
+ .word LESS);
+ IF(8
+ .word DOLIT
+ .word 0x07
+ .word SUBBB
+ .word DUPP
+ .word DOLIT
+ .word 0x0A
+ .word LESS
+ .word ORR);
+ THEN(4
+ .word DUPP
+ .word RFROM
+ .word ULESS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; NUMBER? ( a -- n T | a F ) 
+TWIG 7, "NUMBER?" 
+NUMBQ : 
+ int NUMBQ=
+ COLON(12
+ .word BASE
+ .word AT
+ .word TOR
+ .word DOLIT
+ .word 0x00
+ .word OVER
+ .word COUNT
+ .word OVER
+ .word CAT
+ .word DOLIT
+ .word 0X24
+ .word EQUAL);
+ IF(5
+ .word HEXX
+ .word SWAP
+ .word ONEP
+ .word SWAP
+ .word ONEM);
+ THEN(13
+ .word OVER
+ .word CAT
+ .word DOLIT
+ .word 0X2D
+ .word EQUAL
+ .word TOR
+ .word SWAP
+ .word RAT
+ .word SUBBB
+ .word SWAP
+ .word RAT
+ .word PLUS
+ .word QDUP);
+ IF(1
+ .word ONEM);
+ FOR(6
+ .word DUPP
+ .word TOR
+ .word CAT
+ .word BASE
+ .word AT
+ .word DIGTQ);
+ WHILE(7
+ .word SWAP
+ .word BASE
+ .word AT
+ .word STAR
+ .word PLUS
+ .word RFROM
+ .word ONEP);
+ NEXT(2
+ .word DROP
+ .word RAT);
+ IF(1
+ .word NEGAT);
+ THEN(1
+ .word SWAP);
+ ELSE(6
+ .word RFROM
+ .word RFROM
+ .word DDROP
+ .word DDROP
+ .word DOLIT
+ .word 0x0);
+ THEN(1
+ .word DUPP);
+ THEN(6
+ .word RFROM
+ .word DDROP
+ .word RFROM
+ .word BASE
+ .word STORE
+ .word EXITT
+
+\ Text Output
+
+
+;-----------------------------------------------------------------
+;
+; SPACE ( -- ) 
+TWIG 5, "SPACE" 
+SPACE : 
+ .word BLANK
+ .word EMIT
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; CHARS ( +n c -- ) 
+TWIG 5, "CHARS" 
+CHARS : 
+ int CHARS=
+ COLON(4
+ .word SWAP
+ .word DOLIT
+ .word 0x00
+ .word MAX);
+ FOR(0);
+ AFT(2
+ .word DUPP
+ .word EMIT);
+ THEN(0);
+ NEXT(2
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; SPACES ( +n -- ) 
+TWIG 6, "SPACES" 
+SPACS : 
+ .word BLANK
+ .word CHARS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; TYPE ( b u -- ) 
+TWIG 4, "TYPE" 
+TYPES : 
+ int TYPES=
+ COLON(0);
+ FOR(0);
+ AFT(5
+ .word DUPP
+ .word CAT
+ .word TCHAR
+ .word EMIT
+ .word ONEP);
+ THEN(0);
+ NEXT(2
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; CR ( -- ) 
+TWIG 2, "CR" 
+CR : 
+ .word DOLIT
+ .word 0x0A
+ .word DOLIT
+ .word 0x0D
+ .word EMIT
+ .word EMIT
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; do$ ( -- $adr ) 
+TWIG 3, "do$" 
+DOSTR : 
+ .word RFROM
+ .word RAT
+ .word RFROM
+ .word COUNT
+ .word PLUS
+ .word ALIGN
+ .word TOR
+ .word SWAP
+ .word TOR
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; $”| ( -- a ) 
+TWIG 3, "$\"|" 
+STRQP : 
+ .word DOSTR
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ”| ( -- ) 
+TWIG 3, ".\"|" 
+DOTQP : 
+ .word DOSTR
+ .word COUNT
+ .word TYPES
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; .R ( u +n -- ) 
+TWIG 2, ".R" 
+DOTR : 
+ .word TOR
+ .word STRR
+ .word RFROM
+ .word OVER
+ .word SUBBB
+ .word SPACS
+ .word TYPES
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; U.R ( u +n -- ) 
+TWIG 3, "U.R" 
+UDOTR : 
+ .word TOR
+ .word BDIGS
+ .word DIGS
+ .word EDIGS
+ .word RFROM
+ .word OVER
+ .word SUBBB
+ .word SPACS
+ .word TYPES
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; U. ( u -- ) 
+TWIG 2, "U." 
+UDOT : 
+ .word BDIGS
+ .word DIGS
+ .word EDIGS
+ .word SPACE
+ .word TYPES
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; . (dot) ( n -- ) 
+TWIG 1, "." 
+ DOT : 
+ int DOT=
+ COLON(5
+ .word BASE
+ .word AT
+ .word DOLIT
+ .word 0x0A
+ .word XORR);
+ IF(3
+ .word UDOT
+ .word EXITT
+ THEN(4
+ .word STRR
+ .word SPACE
+ .word TYPES
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ? ( a -- ) 
+TWIG 1, "?" 
+QUEST : 
+ .word AT
+ .word DOT
+ .word EXITT
+
+\ Dictionary Search
+
+
+;-----------------------------------------------------------------
+;
+; (parse) ( b1 u1 c --b2 u2 n ) 
+TWIG 7, "(parse)" 
+PARS : \t int PARS=
+ COLON(5
+ .word TEMP
+ .word CSTOR
+ .word OVER
+ .word TOR
+ .word DUPP);
+ IF(5
+ .word ONEM
+ .word TEMP
+ .word CAT
+ .word BLANK
+ .word EQUAL);
+ IF(0);
+ FOR(6
+ .word BLANK
+ .word OVER
+ .word CAT
+ .word SUBBB
+ .word ZLESS
+ .word INVER);
+ WHILE(1
+ .word ONEP);
+ NEXT(6
+ .word RFROM
+ .word DROP
+ .word DOLIT
+ .word 0x00
+ .word DUPP
+ .word EXITT
+ THEN(1
+ .word RFROM);
+ THEN(2
+ .word OVER
+ .word SWAP);
+ FOR(9
+ .word TEMP
+ .word CAT
+ .word OVER
+ .word CAT
+ .word SUBBB
+ .word TEMP
+ .word CAT
+ .word BLANK
+ .word EQUAL);
+ IF(1
+ .word ZLESS);
+ THEN(0);
+ WHILE(1
+ .word ONEP);
+ NEXT(2
+ .word DUPP
+ .word TOR);
+ ELSE(5
+ .word RFROM
+ .word DROP
+ .word DUPP
+ .word ONEP
+ .word TOR);
+ THEN(6
+ .word OVER
+ .word SUBBB
+ .word RFROM
+ .word RFROM
+ .word SUBBB
+ .word EXITT
+ THEN(4
+ .word OVER
+ .word RFROM
+ .word SUBBB
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; PACK$ ( b u a -- a ) 
+; ???? what is it? 
+TWIG 5, "PACK$" 
+PACKS : 
+ .word DUPP
+ .word TOR
+ .word DDUP
+ .word PLUS
+ .word DOLIT
+ .word 0xFFFFFFFC
+ .word ANDD
+ .word DOLIT
+ .word 0x00
+ .word SWAP
+ .word STORE
+ .word DDUP
+ .word CSTOR
+ .word ONEP
+ .word SWAP
+ .word CMOVEE
+ .word RFROM
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; PARSE ( c -- b u ; <string> ) 
+TWIG 5, "PARSE" 
+PARSE : 
+ .word TOR
+ .word TIB
+ .word INN
+ .word AT
+ .word PLUS
+ .word NTIB
+ .word AT
+ .word INN
+ .word AT
+ .word SUBBB
+ .word RFROM
+ .word PARS
+ .word INN
+ .word PSTOR 
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; TOKEN ( -- a ;; <string> ) 
+TWIG 5, "TOKEN" 
+TOKEN : 
+ .word BLANK
+ .word PARSE
+ .word DOLIT
+ .word 0x1F
+ .word MIN
+ .word HERE
+ .word CELLP
+ .word PACKS
+ .word EXITT PACK$ ;;
+
+;-----------------------------------------------------------------
+;
+; WORD ( c -- a ; <string> ) 
+TWIG 4, "WORD" 
+WORDD : 
+ .word PARSE
+ .word HERE
+ .word CELLP
+ .word PACKS
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; NAME> ( nfa – cfa) 
+TWIG 5, "NAME>" 
+NAMET : 
+ .word COUNT
+ .word DOLIT
+ .word 0x1F
+ .word ANDD
+ .word PLUS
+ .word ALIGN
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; SAME? ( a1 a2 n – a1 a2 f) 
+TWIG 5, "SAME?" 
+SAMEQ : 
+ int SAMEQ=
+ COLON(4
+ .word DOLIT
+ .word 0x1F
+ .word ANDD
+ .word CELLD);
+ FOR(0);
+ AFT(18
+ .word OVER
+ .word RAT
+ .word DOLIT
+ .word 0x4
+ .word STAR
+ .word PLUS
+ .word AT
+ .word UPPER
+ .word OVER
+ .word RAT
+ .word DOLIT
+ .word 0x4
+ .word STAR
+ .word PLUS
+ .word AT
+ .word U PPER
+ .word SUBBB
+ .word QDUP);
+ IF(3
+ .word RFROM
+ .word DROP
+ .word EXITT
+ THEN(0);
+ THEN(0);
+ NEXT(3
+ .word DOLIT
+ .word 0x00
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; FIND ( a va --cfa nfa, a F) 
+; ???? what is it? 
+TWIG 4, "FIND" 
+FIND : 
+ int FIND=
+ COLON(10
+ .word SWAP
+ .word DUPP
+ .word AT
+ .word TEMP
+ .word STORE
+ .word DUPP
+ .word AT
+ .word TOR
+ .word CELLP
+ .word SWAP);
+ BEGIN(2
+ .word AT
+ .word DUPP);
+ IF(9
+ .word DUPP
+ .word AT
+ .word DOLIT
+ .word 0xFFFFFF3F
+ .word ANDD
+ .word UPPER
+ .word RAT
+ .word UPPER
+ .word XORR);
+ IF(3
+ .word CELLP
+ .word DOLIT
+ .word 0XFFFFFFFF);
+ ELSE(4
+ .word CELLP
+ .word TEMP
+ .word AT
+ .word SAMEQ);
+ THEN(0);
+ ELSE(6
+ .word RFROM
+ .word DROP
+ .word SWAP
+ .word CELLM
+ .word SWAP
+ .word EXITT
+ THEN(0);
+ WHILE(2
+ .word CELLM
+ .word CELLM);
+ REPEAT(9
+ .word RFROM
+ .word DROP
+ .word SWAP
+ .word DROP
+ .word CELLM
+ .word DUPP
+ .word NAMET
+ .word SWAP
+ .word EXITT 
+
+\Interpreter
+
+
+;-----------------------------------------------------------------
+;
+; NAME? ( a -- cfa na | a 0 ) 
+TWIG 5, "NAME?" 
+NAMEQ : 
+ .word CNTXT
+ .word FIND
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; EXPECT ( b u1 -- ) 
+TWIG 6, "EXPECT" 
+EXPEC : 
+ .word ACCEP
+ .word SPAN
+ .word STORE
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; QUERY ( -- ) 
+TWIG 5, "QUERY" 
+QUERY : 
+ .word TIB
+ .word DOLIT
+ .word 0X100
+ .word ACCEP
+ .word NTIB
+ .word STORE
+ .word DROP
+ .word DOLIT
+ .word 0x00
+ .word INN
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ABORT ( -- ) 
+TWIG 5, "ABORT" 
+ABORT : 
+ .word NOP
+ .word TABRT
+ .word ATEXE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; abort”| ( f -- ) 
+TWIG 6, "abort\"" 
+ABORQP : 
+ ABORQP=
+ COLON(0);
+ IF(4
+ .word DOSTR
+ .word COUNT
+ .word TYPES
+ .word ABORT);
+ THEN(3
+ .word DOSTR
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ERROR ( a -- ) 
+TWIG 5, "ERROR" 
+ERRORR : 
+ .word SPACE
+ .word COUNT
+ .word TYPES
+ .word DOLIT
+ .word 0x3F
+ .word EMIT
+ .word CR
+ .word ABORT
+
+;-----------------------------------------------------------------
+;
+; $INTERPRET ( a -- ) 
+TWIG 10, "$INTERPRET" 
+$INTER : 
+ int INTER=
+ COLON(2
+ .word NAMEQ
+ .word QDUP);
+ IF(4
+ .word CAT
+ .word DOLIT
+ .word F_COMPO
+ .word ANDD); 
+ .word ABORQ
+ .ascii " compile only"
+INTER0=LABEL(2
+ .word EXECU
+ .word EXITT
+ THEN(1
+ .word NUMBQ);
+ IF(1
+ .word EXITT
+ THEN(1
+ .word ERRORR);
+
+;-----------------------------------------------------------------
+;
+; [ (left-paren) ( -- ) 
+TWIG IMEDD+1, "[" 
+LBRAC : 
+ .word DOLIT
+ .word F_INTERPRET
+ .word TEVAL
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; .OK ( -- ) 
+TWIG 3, ".OK" 
+DOTOK : 
+ int DOTOK=
+ COLON(6
+ .word CR
+ .word DOLIT
+ .word F_INTERPRET
+ .word TEVAL
+ .word AT
+ .word EQUAL);
+ IF(14
+ .word TOR
+ .word TOR
+ .word TOR
+ .word DUPP
+ .word DOT
+ .word RFROM
+ .word DUPP
+ .word DOT
+ .word RFROM
+ .word DUPP
+ .word DOT
+ .word RFROM
+ .word DUPP
+ .word DOT
+ .word DOTQ
+ .ascii " ok>"
+ THEN(1
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; EVAL ( -- ) 
+TWIG 4, "EVAL" 
+EVAL : 
+ int EVAL=
+ COLON(1
+ .word LBRAC);
+ BEGIN(3
+ .word TOKEN
+ .word DUPP
+ .word AT);
+ WHILE(2
+ .word TEVAL
+ .word ATEXE);
+ REPEAT(4
+ .word DROP
+ .word DOTOK
+ .word NOP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; QUIT ( -- ) 
+TWIG 4, "QUIT" 
+QUITT : 
+ int QUITT=
+ COLON(1
+ .word LBRAC);
+ BEGIN(2
+ .word QUERY
+ .word EVAL); 
+ AGAIN(0);
+
+;-----------------------------------------------------------------
+;
+; LOAD ( a n-- ) 
+TWIG 4, "LOAD" 
+LOAD : 
+ .word NTIB
+ .word STORE
+ .word TTIB
+ .word STORE
+ .word DOLIT
+ .word 0x00
+ .word INN
+ .word STORE
+ .word EVAL
+ .word EXITT
+
+\ Compiler
+
+
+;-----------------------------------------------------------------
+;
+; , (comma) ( w -- ) 
+TWIG 1, ", " 
+COMMA : 
+ .word HERE
+ .word DUPP
+ .word CELLP
+ .word CP
+ .word STORE
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; LITERAL ( n -- ) 
+TWIG IMEDD+7, "LITERAL" 
+LITERAL : 
+ .word DOLIT
+ .word DOLIT
+ .word COMMA
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ALLOT ( n -- ) 
+TWIG 5, "ALLOT" 
+ALLOT : 
+ .word ALIGN
+ .word CP
+ .word PSTOR
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; $, ” ( -- ) 
+TWIG 3, "$, \"" 
+STRCQ : 
+ .word DOLIT
+ .word 0X22
+ .word WORDD
+ .word COUNT
+ .word PLUS
+ .word ALIGN
+ .word CP
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ?UNIQUE ( a -- a ) 
+TWIG 7, "?UNIQUE" 
+UNIQU : 
+ int UNIQU=
+ COLON(3
+ .word DUPP
+ .word NAMEQ
+ .word QDUP);
+ IF(6
+ .word COUNT
+ .word DOLIT
+ .word 0x1F
+ .word ANDD
+ .word SPACE
+ .word TYPES); DOTQ(" reDef");
+ THEN(2
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; $, n ( a -- ) 
+TWIG 3, "$, n" 
+SNAME : 
+ int SNAME=
+ COLON(2
+ .word DUPP
+ .word AT);
+ IF(14
+ .word UNIQU
+ .word DUPP
+ .word NAMET
+ .word CP
+ .word STORE
+ .word DUPP
+ .word LAST
+ .word STORE
+ .word CELLM
+ .word CNTXT
+ .word AT
+ .word SWAP
+ .word STORE
+ .word EXITT
+ THEN(1
+ .word ERRORR);
+
+;-----------------------------------------------------------------
+;
+; ' (tick) ( -- cfa ) 
+TWIG 1, "'" 
+ TICK : 
+ int TICK=
+ COLON(2
+ .word TOKEN
+ .word NAMEQ);
+ IF(1
+ .word EXITT
+ THEN(1
+ .word ERRORR);
+
+;-----------------------------------------------------------------
+;
+; [COMPILE] ( -- ; <string> ) 
+TWIG IMEDD+9, "[COMPILE]" 
+BCOMP : 
+ .word TICK
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; COMPILE ( -- ) 
+TWIG 7, "COMPILE" 
+COMPI : 
+ .word RFROM
+ .word DUPP
+ .word AT
+ .word COMMA
+ .word CELLP
+ .word TOR
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; $COMPILE ( a -- ) 
+TWIG 8, "$COMPILE" 
+SCOMP : 
+ int SCOMP=
+ COLON(2
+ .word NAMEQ
+ .word QDUP);
+ IF(4
+ .word AT
+ .word DOLIT
+ .word F_IMEDD
+ .word ANDD);
+ IF(1
+ .word EXECU);
+ ELSE(1
+ .word COMMA);
+ THEN(1
+ .word EXITT
+ THEN(1
+ .word NUMBQ);
+ IF(2
+ .word LITER
+ .word EXITT
+ THEN(1
+ .word ERRORR);
+
+;-----------------------------------------------------------------
+;
+; OVERT ( -- ) 
+TWIG 5, "OVERT" 
+OVERT : 
+ .word LAST
+ .word AT
+ .word CNTXT
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ] (right paren) ( -- ) 
+TWIG 1, "]" 
+ RBRAC : 
+ .word DOLIT
+ .word F_COMPILE
+ .word TEVAL
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; : (colon) ( -- ; <string> ) 
+TWIG 1, ":" 
+COLN : 
+ .word TOKEN
+ .word SNAME
+ .word RBRAC
+ .word DOLIT
+ .word 0x6
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ; (semi-colon) ( -- ) 
+TWIG IMEDD+1, ";" 
+SEMIS : 
+ .word DOLIT
+ .word EXITT
+ .word COMMA
+ .word LBRAC
+ .word OVERT
+ .word EXITT
+
+\ Debugging Tools
+
+
+;-----------------------------------------------------------------
+;
+; dm+ ( b u – b+u ) 
+TWIG 3, "dm+" 
+DMP : 
+ int DMP=
+ COLON(4
+ .word OVER
+ .word DOLIT
+ .word 0x06
+ .word UDOTR);
+ FOR(0);
+ AFT(6
+ .word DUPP
+ .word AT
+ .word DOLIT
+ .word 0x09
+ .word UDOTR
+ .word CELLP);
+ THEN(0);
+ NEXT(1
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; DUMP ( b u -- ) 
+TWIG 4, "DUMP" 
+DUMP : 
+ int DUMP=
+ COLON(10
+ .word BASE
+ .word AT
+ .word TOR
+ .word HEXX
+ .word DOLIT
+ .word 0x1F
+ .word PLUS
+ .word DOLIT
+ .word 0x20
+ .word SLASH);
+ FOR(0);
+ AFT(10
+ .word CR
+ .word DOLIT
+ .word 0x08
+ .word DDUP
+ .word DMP
+ .word TOR
+ .word SPACE
+ .word CELLS
+ .word TYPES
+ .word RFROM);
+ THEN(0);
+ NEXT(5
+ .word DROP
+ .word RFROM
+ .word BASE
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; >NAME ( cfa -- nfa | F ) 
+TWIG 5, ">NAME" 
+TNAME : 
+ int TNAME=
+ COLON(1
+ .word CNTXT);
+ BEGIN(2
+ .word AT
+ .word DUPP);
+ WHILE(3
+ .word DDUP
+ .word NAMET
+ .word XORR);
+ IF(1
+ .word ONEM);
+ ELSE(3
+ .word SWAP
+ .word DROP
+ .word EXITT
+ THEN(0);
+ REPEAT(3
+ .word SWAP
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; .ID ( a -- ) 
+TWIG 3, ".ID" 
+DOTID : 
+ .word COUNT
+ .word DOLIT
+ .word 0x1F
+ .word ANDD
+ .word TYPES
+ .word SPACE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; WORDS ( -- ) 
+TWIG 5, "WORDS" 
+WORDS : 
+ int WORDS=
+ COLON(6
+ .word CR
+ .word CNTXT
+ .word DOLIT
+ .word 0x00
+ .word TEMP
+ .word STORE);
+ BEGIN(2
+ .word AT
+ .word QDUP);
+ WHILE(9
+ .word DUPP
+ .word SPACE
+ .word DOTID
+ .word CELLM
+ .word TEMP
+ .word AT
+ .word DOLIT
+ .word 0x10
+ .word LESS);
+ IF(4
+ .word DOLIT
+ .word 0x01
+ .word TEMP
+ .word PSTOR);
+ ELSE(5
+ .word CR
+ .word DOLIT
+ .word 0x00
+ .word TEMP
+ .word STORE);
+ THEN(0);
+ REPEAT(1
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; FORGET ( -- , <name>) 
+TWIG 6, "FORGET" 
+FORGET : 
+ int FORGT=
+ COLON(3
+ .word TOKEN
+ .word NAMEQ
+ .word QDUP);
+ IF(12
+ .word CELLM
+ .word DUPP
+ .word CP
+ .word STORE
+ .word AT
+ .word DUPP
+ .word CNTXT
+ .word STORE
+ .word LAST
+ .word STORE
+ .word DROP
+ .word EXITT
+ THEN(1
+ .word ERRORR);
+
+;-----------------------------------------------------------------
+;
+; COLD ( -- ) 
+TWIG 4, "COLD" 
+COLD : 
+ .word CR 
+ .work DOTQ
+ .ascii "esp32forth V5.4, 2019 " 
+ int DOTQ1=LABEL(2
+ .word CR
+ .word EXITT
+
+\ Control Structures
+
+
+;-----------------------------------------------------------------
+;
+; THEN ( A -- ) 
+TWIG IMEDD+4, "THEN" 
+THENN : 
+ .word HERE
+ .word SWAP
+ .word STORE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; FOR ( -- a ) 
+TWIG IMEDD+3, "FOR" 
+FOR : 
+ .word COMPI
+ .word TOR
+ .word HERE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; BEGIN ( -- a ) 
+TWIG IMEDD+5, "BEGIN" 
+BEGIN : 
+ .word HERE
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; NEXT ( a -- ) 
+TWIG IMEDD+4, "NEXT" 
+NEXT : 
+ .word COMPI
+ .word DONXT
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; UNTIL ( a -- ) 
+TWIG IMEDD+5, "UNTIL" 
+UNTIL : 
+ .word COMPI
+ .word QBRAN
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; AGAIN ( a -- ) 
+TWIG IMEDD+5, "AGAIN" 
+AGAIN : 
+ .word COMPI
+ .word BRAN
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; IF ( -- A ) 
+TWIG IMEDD+2, "IF" 
+IFF : 
+ .word COMPI
+ .word QBRAN
+ .word HERE
+ .word DOLIT
+ .word 0x00
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; AHEAD ( -- A ) 
+TWIG IMEDD+5, "AHEAD" 
+AHEAD : 
+ .word COMPI
+ .word BRAN
+ .word HERE
+ .word DOLIT
+ .word 0x00
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; REPEAT ( A a -- ) 
+TWIG IMEDD+6, "REPEAT" 
+REPEAT : 
+ .word AGAIN
+ .word THENN
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; AFT ( a -- a A ) 
+TWIG IMEDD+3, "AFT" 
+AFT : 
+ .word DROP
+ .word AHEAD
+ .word HERE
+ .word SWAP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ELSE ( A -- A ) 
+TWIG IMEDD+4, "ELSE" 
+ELSE : 
+ .word AHEAD
+ .word SWAP
+ .word THENN
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; WHILE ( a -- A a ) 
+TWIG IMEDD+5, "WHILE" 
+WHILE : 
+ .word IFF
+ .word SWAP
+ .word EXITT
+
+\ String Literals
+
+
+;-----------------------------------------------------------------
+;
+; ABORT" ( -- ; <string> ) 
+TWIG IMEDD+6, "ABORT\"" 
+ABORT" : 
+ .word DOLIT
+ .word ABORQP
+ .word HERE
+ .word STORE
+ .word STRCQ
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; $" ( -- ; <string> ) 
+TWIG IMEDD+2, "$\"" 
+STRQ : 
+ .word DOLIT
+ .word STRQP
+ .word HERE
+ .word STORE
+ .word STRCQ
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ." (dot-quot) ( -- ; <string> ) 
+TWIG IMEDD+2, ".\"" 
+DOTQQ : 
+ .word DOLIT
+ .word DOTQP
+ .word HERE
+ .word STORE
+ .word STRCQ
+ .word EXITT
+
+\ Defining words
+
+
+;-----------------------------------------------------------------
+;
+; CODE ( -- ; <string> ) 
+TWIG 4, "CODE" 
+CODE : 
+ .word TOKEN
+ .word SNAME
+ .word OVERT
+ .word ALIGN
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; CREATE ( -- ; <string> )  
+; ???? what is it? 
+TWIG 6, "CREATE" 
+CREAT : 
+ .word CODE
+ .word DOLIT
+ .word 0x203D
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; VARIABLE ( -- ; <string> ) 
+TWIG 8, "VARIABLE" 
+VARIA : 
+ .word CREAT
+ .word DOLIT
+ .word 0x00
+ .word COMMA
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; CONSTANT ( n -- ; <string> ) 
+; ???? what is it? 
+TWIG 8, "CONSTANT" 
+CONST : 
+ .word CODE
+ .word DOLIT
+ .word 0x2004
+ .word COMMA
+ .word COMMA
+ .word EXITT
+
+\ Comments
+
+
+;-----------------------------------------------------------------
+;
+; .( (dot-paren) ( -- ; <string> ) 
+TWIG IMEDD+2, ".(" 
+DOTPR : 
+ .word DOLIT
+ .word 0X29
+ .word PARSE
+ .word TYPES
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; \ (back-slash) ( -- ; <string> ) 
+TWIG IMEDD+1, "\\" 
+BKSLA : 
+ .word DOLIT
+ .word 0xA
+ .word WORDD
+ .word DROP
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; ( (paren) ( -- ; <string> ) 
+TWIG IMEDD+1, "(" 
+PAREN : 
+ .word DOLIT
+ .word 0X29
+ .word PARSE
+ .word DDROP
+ .word EXITT
+
+\ Lexicon Bits
+
+
+;-----------------------------------------------------------------
+;
+; COMPILE-ONLY ( -- ) 
+TWIG 12, "COMPILE-ONLY" 
+ONLY : 
+ .word DOLIT
+ .word 0x40
+ .word LAST
+ .word AT
+ .word PSTOR
+ .word EXITT
+
+;-----------------------------------------------------------------
+;
+; IMMEDIATE ( -- ) 
+TWIG 9, "IMMEDIATE" 
+IMMED : 
+ .word DOLIT
+ .word F_IMMED
+ .word LAST
+ .word AT
+ .word PSTOR
+ .word EXITT
+
+;-----------------------------------------------------------------
+
+

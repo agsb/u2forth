@@ -28,6 +28,11 @@
 
 #include <avr/io.h>
 
+/*
+just dont compile by sdt
+#include <avr/eeprom.h>
+#include <avr/wdt.h>
+*/
 ;----------------------------------------------------------------------
 ;
 ; 02/12/2020
@@ -36,70 +41,91 @@
 ;
 ; u2forth
 ;
-; inspired on eforth from books and papers from C. H. Ting
-;
-; just experience for small microcontrolers
-;
-; emulates a virtual uCi, really, really, just using SEG and PC, ((0x3D) + 0x20) is reserved for interrups (future)
-;
-; still no interrupts
-;
-; still no multitasks
-;
-; forth for ATMEGA8, 8k flash, 1k SRAM,
-; internal clock 8 MHz, USART 9600,8,N,1
-;
-; using GCC avr-as -mmcu=atmega8
-;
-; on a 8 MHz clock frequency, one instruction cycle requires 1/8 us or 125 ns
-;
-; "The job isn't over until the paperwork is done."
-;
-; "The first register is always the target register !"
-;
-; .equ assign a constant value to a label
-;
-; .set assign a variable value to a label
-;
-; .rept number \n codes \n .endr ; repeats "codes" number times
-;
-; POP == .SP + 1;
-; PSH == .SP - 1;
-;
-; convention for translate forth names to assembler names
-;
-; use LE for <=
-; use GT for >=
-; use NE for <>
-; use LT for <
-; use GT for >
-; use EQ for =
-; use TK for '
-;
-; use MUL for *
-; use DIV for /
-; use PLUS for +
-; use MINUS for -
-;
-; use BY for /
-; use QM for ?
-; use AT for @
-; use TO for !
-; use ZERO for 0
-; use ONE for 1
-; use TWO for 2
-;
-;----------------------------------------------------------------------
-;
-; .word link ; link to previous
-; .byte size ; sizeof name OR mask 0x1F
-; .ascii "name" ; name
-; .byte opcode ; opcode
-; .word param, ; many
-;
+
+/*
+
+  inspired on eforth from books and papers from C. H. Ting
+ 
+  just experience for small microcontrolers
+ 
+  emulates a virtual uCi, really, really, just using SEG and PC, ((0x3D) + 0x20) is reserved for interrups (future)
+ 
+  still no interrupts
+ 
+  still no multitasks
+ 
+  forth for ATMEGA8, 8k flash, 1k SRAM,
+  internal clock 8 MHz, USART 9600,8,N,1
+ 
+  using GCC avr-as -mmcu=atmega8
+ 
+  vide https://www.ic.unicamp.br/~celio/mc404-2014/docs/gnu-arm-directives.pdf
+ 
+  on a 8 MHz clock frequency, one instruction cycle requires 1/8 us or 125 ns
+ 
+  "The job isn't over until the paperwork is done."
+ 
+  "The first register is always the target register !"
+ 
+  .equ assign a constant value to a label
+ 
+  .set assign a variable value to a label
+ 
+  .rept number \n codes \n .endr ; repeats "codes" number times
+ 
+		
+		1.   System dictionary space used in bytes 
+
+      	2.   Application dictionary space available in bytes 
+
+      	3.   Data space in bytes 
+
+      	4.   Return stack space in bytes 
+ 
+ FORTH event loop is COLD-->QUIT-->BEGIN-QUERY-EVAL-AGAIN
+ 
+ stacks are last in first out, LIFO
+ 
+ POP == .SP + 1;
+ PSH == .SP - 1;
+ 
+ convention for translate forth names to assembler names
+ 
+ use LE for <=
+ use GT for >=
+ use NE for <>
+ use LT for <
+ use GT for >
+ use EQ for =
+ use TK for '
+ 
+ use MUL for *
+ use DIV for /
+ use PLUS for +
+ use MINUS for -
+ 
+ use BY for /
+ use QM for ?
+ use AT for @
+ use TO for !
+ use ZERO for 0
+ use ONE for 1
+ use TWO for 2
+ 
 ;----------------------------------------------------------------------
 
+ .word link   link to previous
+ .byte size   sizeof name OR mask 0x1F
+ .ascii "name"   name
+ .byte opcode   opcode
+ .word param,   many
+
+;----------------------------------------------------------------------
+
+*/
+
      .NOLIST
+
      .LIST
 
 ;----------------------------------------------------------------------
@@ -111,59 +137,59 @@
 ;----------------------------------------------------------------------
 ; generic use
 #define         _work_    r0    
-;.equ	_work_, r0
+; .set _work_ , r0    
 
 ; always zero
 #define         _zero_    r1    
-;.equ	_zero_, r1
+; .set _zero_ , r1
 
 ; Z instruction pointer for access sram and flas_high memory
 #define         ip_low     r30    
-;.equ	ipl,	r30
+;.set	ipl,	r30
 
 ; Z instruction pointer for access sram and flas_high memory
 #define         ip_high     r31    
-;.equ	iph,	r31
+;.set	iph,	r31
 
 ; Y return stack pointer for access sram
 #define         rsp_low    r28    
-;.equ	rspl,	r28
+;.set	rspl,	r28
 
 ; Y return stack pointer for access sram
 #define         rsp_high    r29    
-;.equ	rsph,	r29
+;.set	rsph,	r29
 
 ; X parameter stack pointer for access sram
 #define         psp_low    r26    
-;.equ	pspl,	r26
+;.set	pspl,	r26
 
 ; X parameter stack pointer for access sram
 #define         psp_high    r27    
-;.equ	psph,	r27
+;.set	psph,	r27
 
 ; work registers
 #define         wrk_low    r24    
-;.equ	wl,	r24
+;.set	wl,	r24
 
 ; work registers
 #define         wrk_high    r25    
-;.equ	wh,	r25
+;.set	wh,	r25
 
 ; second value parameter stack
 #define         nds_low    r22    
-;.equ	nl,	r22
+;.set	nl,	r22
 
 ; second value parameter stack
 #define         nds_high    r23    
-;.equ	nh, r23
+;.set	nh, r23
 
 ; fist value parameter stack
 #define         tos_low    r20    
-;.equ	tl,	r20
+;.set	tl,	r20
 
 ; fist value parameter stack
 #define         tos_high    r21    
-;.equ	th,	r21
+;.set	th,	r21
 
 ;----------------------------------------------------------------------
 ;
@@ -176,20 +202,27 @@
 
 ;----------------------------------------------------------------------
 ;
-; default sizes
-        STACK_SIZE = 0x20 ; 32 bytes
-        TERMS_SIZE = 0x50 ; 80 bytes
-        BUFFER_SIZE = 0x50 ; 128 bytes
+; default sizes forth83
+		SPU_SIZE = 32
+
+        PSP_SIZE = 64
+		RSP_SIZE = 48
+
+		TIB_SIZE = 80
+		PAD_SIZE = 84
 ;----------------------------------------------------------------------
-;
 ; grows downwards ((0x3D) + 0x20) = ((0x3D) + 0x20) - 1
         SPP_TOP = SRAM_END
-        RSP_TOP = SPP_TOP - STACK_SIZE
-        PSP_TOP = RSP_TOP - STACK_SIZE
+        RSP_TOP = SPP_TOP - SPU_SIZE
+        PSP_TOP = RSP_TOP - RSP_SIZE
 ;----------------------------------------------------------------------
-;
 ; grows upwards PT = PT + 1
-        TIB_TOP = PSP_TOP - STACK_SIZE - TERMS_SIZE
+        TIB_TOP = PSP_TOP - PSP_SIZE - TIB_SIZE
+
+;----------------------------------------------------------------------
+; grows upwards PT = PT + 1
+        PAD_TOP = TIB_TOP - PAD_SIZE
+;
 ;----------------------------------------------------------------------
 ;
 ; flags for words
@@ -208,6 +241,10 @@
         BASEE = 16
 ;----------------------------------------------------------------------
 ;
+;
+
+;----------------------------------------------------------------------
+;
 ; version information
 ;
 .equ version, 0x0100
@@ -217,6 +254,7 @@
 ; start reverse linked list
 ;
 .set _LINK , 0x0
+.set _THIS , 0x0
 
 ;----------------------------------------------------------------------
 ;
@@ -225,19 +263,21 @@
 .equ isNOOP, 0
 .equ isLEAF, 1
 .equ isTWIG, 2
+.equ isRESET, 3
 
 ;----------------------------------------------------------------------
 ;
 ; header of word in dictionary
-; opcode for CODE ( execute a opcode )
-; must end with CODE :)
+; opcode for CORE ( execute a opcode )
+; must end with CORE :)
 ;
 .macro LEAF size , name
+.set _THIS, .
 .word _LINK
+.set _LINK, _THIS 
 .byte \size
 .ascii "\name"
 .byte isLEAF
-.set _LINK , .
 .balign 2
 .endm
 
@@ -248,11 +288,12 @@
 ; must end with EXIT :)
 ;
 .macro TWIG size , name
+.set _THIS, .
 .word _LINK
+.set _LINK, _THIS 
 .byte \size
 .ascii "\name"
 .byte isTWIG
-.set _LINK , .
 .balign 2
 .endm
 
@@ -281,6 +322,7 @@
 .endm
 
 ;----------------------------------------------------------------------
+; also io@
 .macro peek byte , address
         .if (\address < $40)
          in \byte , \address
@@ -290,6 +332,7 @@
 .endm
 
 ;----------------------------------------------------------------------
+; also io!
 .macro poke byte , address
         .if (\address < $40)
          out \byte , \address
@@ -327,7 +370,7 @@ main:
         reti ; rjmp TIM1_COMPA ; Timer1 CompareA Handler
         reti ; rjmp TIM1_COMPB ; Timer1 CompareB Handler
         reti ; rjmp TIM1_OVF ; Timer1 Overflow Handler
-        reti ; rjmp TIM0_OVF ; Time_work_ Overflow Handler
+        rjmp TIM0_OVF ; Timer0 Overflow Handler
         reti ; rjmp SPI_STC ; SPI Transfer Complete Handler
         reti ; rjmp USART_RXC ; USART RX Complete Handler
         reti ; rjmp USART_UDRE ; ((0x0C) + 0x20) Empty Handler
@@ -339,6 +382,50 @@ main:
         reti ; rjmp SPM_RDY ; Store Program Memory Ready Handler;
 
 ;----------------------------------------------------------------------
+; watch dogh
+;	WDTCSR = bit (WDIE) | bit (WDP2) | bit (WDP1);    // set WDIE, and 1 second delay
+#define	WDIE	6
+#define WDP2	2
+#define WDP1	1
+#define WDE		3
+#define WDCE	4
+;----------------------------------------------------------------------
+;----------------------------------------------------------------------
+;
+;	timer0 prescale using 64, 
+;
+;	count as 61, about 1008,07 Hz
+;	count as 62, about  992,07 Hz, 
+;
+;	counter cotinues while inside ? 
+;   without these instructions ?
+;
+TIM0_OVF:
+;	save flags and stop interrups
+		in R5, __SREG__
+		cli
+;	reset watch dog
+		wdr
+;	get counter
+		lds R3, TIMER
+		lds R2, TIMER+1
+; 	increase counter
+		eor	R4, R4
+		inc R4
+		add R2, R4
+		dec R4
+		adc R2, R4
+;	put counter
+		sts TIMER, R3
+		sts TIMER+1, R2
+;	adjusts counter
+;		out TCNT0H, R2
+;		out TCNT0L, R3
+
+;	load flags and return
+		out __SREG__, R5
+		sei
+		reti
 
 ;----------------------------------------------------------------------
 ;
@@ -368,7 +455,28 @@ RESET:
         out __SP_H__, wrk_high
         ldi wrk_low, lo8(SPP_TOP)
         out __SP_L__, wrk_low
-        ; sei ; Enable interrupts
+
+; reset WDT
+		wdr
+;
+;  define watch dog counter
+;		??? code
+;
+; write logical one to WDCE and WDE
+;		in wrk_low, WDTCR
+;		ori wrk_low, (1<<WDCE)|(1<<WDE)
+;		out WDTCR, wrk_low		
+; turn off wd
+;		ldi wrk_low, (0<<WDE)
+;		out WDTRC, wrk_low
+;		ori wrk_low, (1<<WDIE)|(1<<WDP2)|(1<<WDP1)
+;		out WDTCR, wrk_low
+;
+;	WDTCSR = (1<<WDIE) | (1<<WDP2) | (1<< WDP1);    // set WDIE, and 1 second delay
+;	WDTCR = (1<<WDE)|(1<<WDP0)|(1<<WDP1)|(1<<WDP2)
+
+; Enable interrupts
+		sei
 
 ;----------------------------------------------------------------------
 ; init instruction pointer and etc
@@ -391,6 +499,7 @@ BYE:
 ;
 LEAF 5, "ABORT"
 ABORT:
+; init return stack
         ldi rsp_high, hi8(RSP_TOP)
         ldi rsp_low, lo8(RSP_TOP)
 
@@ -414,7 +523,6 @@ QUIT:
         ldi zl, lo8(variables)
         ldi xh, hi8(SRAM_START)
         ldi xl, lo8(SRAM_START)
-        ; ???? size in wrk_low,wrk_high
 _COPY:
         ld _work_, Z+
         st X+, r0
@@ -425,9 +533,10 @@ _COPY:
 
         ; must point to real start
 
-        eor r31, r31
-        eor r30, r30
-        rjmp CODE
+        ldi zh, hi8(variables)
+        ldi zl, lo8(variables)
+        rjmp CORE
+
 ;----------------------------------------------------------------------
 ; start forth,
 ;----------------------------------------------------------------------
@@ -464,7 +573,7 @@ TXTO:
 ;
 ; init usart, from avr-gcc public code, io ports as constants
 ;
-LEAF 3, "!IO"
+LEAF 3, "IO!"
 IOYO:
         eor wrk_low, wrk_low
         out 0x20, wrk_low
@@ -478,12 +587,12 @@ IOYO:
         in wrk_low,0x20
         ori wrk_low,lo8(64)
         out 0x20,wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok push a value from flash into parameter stack
-LEAF 7, "LITERAL"
-LITERAL:
+LEAF 7, "LITL"
+LITL:
         pspush nds_low, nds_high
         movw nds_low, tos_low
         ipread tos_low
@@ -492,23 +601,9 @@ LITERAL:
 
 ;----------------------------------------------------------------------
 ; test index loop in rsp, if 0< exit loop else next
-LEAF 4, "doVAR"
-DOVAR:
-		rjmp CODE
-
-;----------------------------------------------------------------------
-; test index loop in rsp, if 0< exit loop else next
-LEAF 4, "doNext"
-DONEXT:
-        rspull wrk_low, wrk_high
-        sbiw wrk_low, 1
-        brge _DONEXT1 
-
-		rjmp EXIT
-_DONEXT1:
-        adiw wrk_low, 1
-        rspush wrk_low, wrk_high
-        rjmp CODE
+;LEAF 4, "doVAR"
+;DOVAR:
+;		rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -529,7 +624,7 @@ LEAF 7, "?BRANCH"
 QMBRANCH:
         rcall TSTOP
         breq BRANCH
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok branch
@@ -565,7 +660,7 @@ ENTER:
 GOES:
         sbiw wrk_low, 1 ; point to opcode.
         movw zl, wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok 2drop
@@ -573,7 +668,7 @@ LEAF 5, "2DROP"
 TWODROP:
         pspull tos_low, tos_high
         pspull nds_low, nds_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok 2dup
@@ -581,7 +676,7 @@ LEAF 4, "2DUP"
 TWODUP:
         pspush nds_low, nds_high
         pspush tos_low, tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok +! to
@@ -630,7 +725,7 @@ AT:
         ld tos_low, x+
 _AT1:
         rspull xl, xh
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok C@ cat
@@ -650,7 +745,7 @@ RAT:
         movw nds_low, tos_low
         rspull tos_low, tos_high
         sbiw rsp_low, 1
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok R>
@@ -659,7 +754,7 @@ RGT:
         pspush nds_low, nds_high
         movw nds_low, tos_low
         rspull tos_low, tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok >R
@@ -694,7 +789,7 @@ PSAT:
 LEAF 4, "PS!"
 PSTO:
         movw psp_low, tos_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok ?DUP (a -- 0 | a a)
@@ -705,7 +800,7 @@ QMDUP:
 		breq _QMDUP1
         rjmp DUP
 _QMDUP1:
-		rjmp CODE
+		rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok DUP (a -- a a)
@@ -713,7 +808,7 @@ LEAF 3, "DUP"
 DUP:
         pspush nds_low, nds_high
         movw nds_low, tos_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok SWAP (a b -- b a)
@@ -722,7 +817,7 @@ SWAP:
         movw wrk_low, nds_low
         movw nds_low, tos_low
         movw tos_low, wrk_low
-        rjmp CODE
+        rjmp CORE
  
 ;----------------------------------------------------------------------
 ;
@@ -732,7 +827,7 @@ LEAF 4, "DROP"
 DROP:
         movw tos_low, nds_low
         pspull nds_low, nds_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -744,7 +839,7 @@ PUSHS:
         pspush nds_low, nds_high
         movw nds_low, tos_low
         movw tos_low, wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok ROT (a b c -- b c a)
@@ -892,7 +987,7 @@ LEAF 3, "INV"
 INV:
         com tos_low
         com tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok NEG
@@ -900,7 +995,7 @@ LEAF 3, "NEG"
 NEG:
         neg tos_low
         neg tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok 2*
@@ -908,7 +1003,7 @@ LEAF 2, "2*"
 SHL:
         lsl tos_low
         rol tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ok 2/
@@ -916,7 +1011,7 @@ LEAF 2, "2/"
 SHR:
         asr tos_high
         ror tos_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; UM+
@@ -929,7 +1024,7 @@ UPLUS:
         eor tos_low, tos_low
         eor tos_high, tos_high
         rol tos_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1070,7 +1165,7 @@ d16ures:
 ;
         movw nds_low, r16
 		movw tos_low, r14
-        rjmp CODE
+        rjmp CORE
 
 d16u_2: rol wrk_low ;shift dividend into remainder
         rol wrk_high
@@ -1151,7 +1246,7 @@ d16s_4:                      ;    return
 d16sres:
         movw nds_low, r16
 		movw tos_low, r14
-        rjmp CODE
+        rjmp CORE
 
 d16s_5: rol     drem16sL        ;shift dividend into remainder
         rol     drem16sH
@@ -1210,7 +1305,7 @@ m16s_2: sbrc    mp16sL,0        ;if current bit set
         brne    m16s_1          ;if not done, loop more
 m16sres:
         mov nds_low, r16
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1262,7 +1357,7 @@ m16ures:
 ;	move operands
 ;
         movw nds_low, r18
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 
@@ -1279,7 +1374,7 @@ ALLIGN:
 		movw tos_low, wrk_low
         lsr tos_low
         lsl tos_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1308,7 +1403,7 @@ CELLPLUS:
         movw wrk_low, tos_low
         adiw wrk_low, 2
         movw tos_low, wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1319,7 +1414,7 @@ CELLMINUS:
         movw wrk_low, tos_low
         sbiw wrk_low, 2
         movw tos_low, wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1329,7 +1424,7 @@ ONEPLUS:
         movw wrk_low, tos_low
         adiw wrk_low, 1
         movw tos_low, wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1338,7 +1433,7 @@ ONEMINUS:
         movw wrk_low, tos_low
         sbiw wrk_low, 1
         movw tos_low, wrk_low
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ????
@@ -1372,7 +1467,7 @@ DSHR:
         ror nds_high
         ror tos_low
         ror tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ????
@@ -1382,7 +1477,7 @@ DSHL:
         rol nds_high
         rol tos_low
         rol tos_high
-        rjmp CODE
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; ????
@@ -1399,37 +1494,75 @@ DSHL:
 ;
 LEAF 3, "RND"
 RND:
-;
 ;	load seed
-;
-		ldi _work_, 0x02
-		eor wrk_low, _work
-		ldi _work_, 0xA8
-		eor wrk_high, _work
+		lds wrk_low, RANDW
+		lds wrk_high, RANDW + 1
 ;
 ;	run magics
 ;
 		eor	wrk_low, wrk_high
 		swap wrk_low
 		add wrk_high, wrk_low
+
+;	save seed
+		sts RANDW, wrk_low
+		sts RANDW + 1, wrk_high
+;
 		rjmp PUSH
 
 ;----------------------------------------------------------------------
 ; maybe another random 37
 
 _RAND0:
-		movw wrk_low, tos_low
-
-		eor	wrk_low, wrk_high
-		swap wrk_low
-		add wrk_high, wrk_low
-		
-		ldi	wrk_high, 37
-_RAND1:
 		sub wrk_low, wrk_high
 		brlt _RAND1
 		add wrk_low, wrk_high
-				
+
+
+;----------------------------------------------------------------------
+;*************************************************************************
+;*                                                                       *
+;*                      Convert unsigned 16 bit to 5 digit ASCII         *
+;*                                                                       *
+;*              Author: Peter Dannegger                                  *
+;*                                                                       *
+;*************************************************************************
+; https://www.avrfreaks.net/forum/smallest-and-fastest-binary-bcd-conversion?page=all
+;
+;
+;input: R17, R16 = 16 bit value 0 ... 65535
+;output: R20, R19, R18, R17, R16 = 5 digits (ASCII)
+;cycle: 20 ... 170
+;
+
+bin16_ascii:
+
+        ldi     r20, -1 + '0'
+_bcd1:  inc     r20
+        subi    r16, lo(10000)         
+        sbci    r17, hi(10000)
+        brcc    _bcd1
+
+        ldi     r19, 10 + '0'
+_bcd2:  dec     r19
+        subi    r16, lo(-1000)  
+        sbci    r17, hi(-1000)
+        brcs    _bcd2
+
+        ldi     r18, -1 + '0'
+_bcd3:  inc     r18
+        subi    r16, lo(100)   
+        sbci    r17, hi(100)
+        brcc    _bcd3
+
+        ldi     r17, 10 + '0'
+_bcd4:  dec     r17
+        subi    r16, -10      
+        brcs    _bcd4
+
+        subi    r16, -'0'
+        ret
+;---------------------------------------------------------------------
 	
 ;----------------------------------------------------------------------
 ;
@@ -1451,13 +1584,13 @@ JUMPS:
 .balign 2
 
         rjmp NOOP ; isNOOP
-        rjmp CODE ; isLEAF
+        rjmp CORE ; isLEAF
         rjmp ENTER ; isTWIG
         rjmp EXIT ; reserved
-        rjmp CODE ; reserved
-        rjmp CODE ; reserved
-        rjmp CODE ; reserved
-        rjmp CODE ; reserved
+        rjmp RESET ; reserved
+        rjmp CORE ; reserved
+        rjmp CORE ; reserved
+        rjmp CORE ; reserved
 
 ;---------------------------------------------------------------------
 ;
@@ -1483,7 +1616,7 @@ JUMPS:
         rjmp CELLSZ 
         rjmp CMOVE 
         rjmp CMOVEGT 
-        rjmp CODE 
+        rjmp CORE 
         rjmp CTO 
         rjmp DONEXT 
         rjmp DOVAR 
@@ -1520,7 +1653,6 @@ JUMPS:
         rjmp QMDUP 
         rjmp QUIT 
         rjmp RAT 
-        rjmp RESET 
         rjmp RGT 
         rjmp ROT 
         rjmp RSAT 
@@ -1547,13 +1679,14 @@ JUMPS:
 ;
 LEAF 4, "NOOP"
 NOOP:
-        rjmp CODE
+        rjmp CORE
+
 ;---------------------------------------------------------------------
 ;
 ; read a opcode in [ip]
 ;
-LEAF 4, "CODE"
-CODE:
+LEAF 4, "CORE"
+CORE:
 ; trampoline
 
 ; offset by multiply by 2
@@ -1587,7 +1720,7 @@ CODE:
 
 ;----------------------------------------------------------------------
 
-#include "twigs.inc" 
+;#include "twigs.inc" 
 
 ;----------------------------------------------------------------------
 
