@@ -112,13 +112,16 @@ just dont compile by sdt
  use ONE for 1
  use TWO for 2
  
+	use name between parentesis (name) for internal use of forth
+ 
 ;----------------------------------------------------------------------
-
- .word link   link to previous
- .byte size   sizeof name OR mask 0x1F
+; dictionary structure
+;
+ .word  link     link to previous
+ .byte  size     sizeof name OR mask 0x1F
  .ascii "name"   name
- .byte opcode   opcode
- .word param,   many
+ .byte  opcode   opcode
+ .word  param,   many
 
 ;----------------------------------------------------------------------
 
@@ -210,11 +213,13 @@ just dont compile by sdt
 
 		TIB_SIZE = 80
 		PAD_SIZE = 84
+
 ;----------------------------------------------------------------------
-; grows downwards ((0x3D) + 0x20) = ((0x3D) + 0x20) - 1
+; grows downwards SP = SP - 1
         SPP_TOP = SRAM_END
         RSP_TOP = SPP_TOP - SPU_SIZE
         PSP_TOP = RSP_TOP - RSP_SIZE
+
 ;----------------------------------------------------------------------
 ; grows upwards PT = PT + 1
         TIB_TOP = PSP_TOP - PSP_SIZE - TIB_SIZE
@@ -239,9 +244,12 @@ just dont compile by sdt
 ; default base
 ;
         BASEE = 16
-;----------------------------------------------------------------------
+
+;---------------------------------------------------------------------
 ;
+; default cell size
 ;
+		CELL_SZ = 2
 
 ;----------------------------------------------------------------------
 ;
@@ -351,7 +359,7 @@ just dont compile by sdt
 ; code segment, flash
 ;
 .section .text
-.org 0x00000
+; .org 0x00000
 .global main
 main:
 
@@ -381,15 +389,6 @@ main:
         reti ; rjmp TWSI ; Two-wire Serial Interface Handler
         reti ; rjmp SPM_RDY ; Store Program Memory Ready Handler;
 
-;----------------------------------------------------------------------
-; watch dogh
-;	WDTCSR = bit (WDIE) | bit (WDP2) | bit (WDP1);    // set WDIE, and 1 second delay
-#define	WDIE	6
-#define WDP2	2
-#define WDP1	1
-#define WDE		3
-#define WDCE	4
-;----------------------------------------------------------------------
 ;----------------------------------------------------------------------
 ;
 ;	timer0 prescale using 64, 
@@ -442,7 +441,7 @@ TIM0_OVF:
         __SP_L__ = 0x3d
 
 ;----------------------------------------------------------------------
-; wise force to align
+; 
 LEAF 5, "RESET"
 RESET:
 ; clear interrupts
@@ -455,6 +454,15 @@ RESET:
         out __SP_H__, wrk_high
         ldi wrk_low, lo8(SPP_TOP)
         out __SP_L__, wrk_low
+
+;----------------------------------------------------------------------
+; watch dogh
+;	WDTCSR = bit (WDIE) | bit (WDP2) | bit (WDP1);    // set WDIE, and 1 second delay
+#define	WDIE	6
+#define WDP2	2
+#define WDP1	1
+#define WDE		3
+#define WDCE	4
 
 ; reset WDT
 		wdr
@@ -469,11 +477,9 @@ RESET:
 ; turn off wd
 ;		ldi wrk_low, (0<<WDE)
 ;		out WDTRC, wrk_low
+; set WDIE, and 1 second delay
 ;		ori wrk_low, (1<<WDIE)|(1<<WDP2)|(1<<WDP1)
 ;		out WDTCR, wrk_low
-;
-;	WDTCSR = (1<<WDIE) | (1<<WDP2) | (1<< WDP1);    // set WDIE, and 1 second delay
-;	WDTCR = (1<<WDE)|(1<<WDP0)|(1<<WDP1)|(1<<WDP2)
 
 ; Enable interrupts
 		sei
@@ -600,7 +606,7 @@ LITL:
         rjmp EXIT
 
 ;----------------------------------------------------------------------
-; test index loop in rsp, if 0< exit loop else next
+; get address of a variable ????
 ;LEAF 4, "doVAR"
 ;DOVAR:
 ;		rjmp CORE
@@ -1382,7 +1388,7 @@ ALLIGN:
 ;
 LEAF 2, "CELL"
 CELLSZ:
-        ldi wrk_low, 2
+        ldi wrk_low, CELL_SZ
         eor wrk_high, wrk_high
         rjmp PUSHS
 
@@ -1401,7 +1407,7 @@ CELLS:
 LEAF 5, "CELL+"
 CELLPLUS:
         movw wrk_low, tos_low
-        adiw wrk_low, 2
+        adiw wrk_low, CELL_SZ
         movw tos_low, wrk_low
         rjmp CORE
 
@@ -1412,7 +1418,7 @@ CELLPLUS:
 LEAF 5, "CELL-"
 CELLMINUS:
         movw wrk_low, tos_low
-        sbiw wrk_low, 2
+        sbiw wrk_low, CELL_SZ
         movw tos_low, wrk_low
         rjmp CORE
 
@@ -1495,8 +1501,8 @@ DSHL:
 LEAF 3, "RND"
 RND:
 ;	load seed
-		lds wrk_low, RANDW
-		lds wrk_high, RANDW + 1
+		lds wrk_low, _RANDW
+		lds wrk_high, _RANDW + 1
 ;
 ;	run magics
 ;
@@ -1505,19 +1511,10 @@ RND:
 		add wrk_high, wrk_low
 
 ;	save seed
-		sts RANDW, wrk_low
-		sts RANDW + 1, wrk_high
+		sts _RANDW, wrk_low
+		sts _RANDW + 1, wrk_high
 ;
-		rjmp PUSH
-
-;----------------------------------------------------------------------
-; maybe another random 37
-
-_RAND0:
-		sub wrk_low, wrk_high
-		brlt _RAND1
-		add wrk_low, wrk_high
-
+		rjmp PUSHS
 
 ;----------------------------------------------------------------------
 ;*************************************************************************
@@ -1539,20 +1536,20 @@ bin16_ascii:
 
         ldi     r20, -1 + '0'
 _bcd1:  inc     r20
-        subi    r16, lo(10000)         
-        sbci    r17, hi(10000)
+        subi    r16, lo8(10000)         
+        sbci    r17, hi8(10000)
         brcc    _bcd1
 
         ldi     r19, 10 + '0'
 _bcd2:  dec     r19
-        subi    r16, lo(-1000)  
-        sbci    r17, hi(-1000)
+        subi    r16, lo8(-1000)  
+        sbci    r17, hi8(-1000)
         brcs    _bcd2
 
         ldi     r18, -1 + '0'
 _bcd3:  inc     r18
-        subi    r16, lo(100)   
-        sbci    r17, hi(100)
+        subi    r16, lo8(100)   
+        sbci    r17, hi8(100)
         brcc    _bcd3
 
         ldi     r17, 10 + '0'
@@ -1583,10 +1580,17 @@ JUMPS:
 ;---------------------------------------------------------------------
 .balign 2
 
-        rjmp NOOP ; isNOOP
-        rjmp CORE ; isLEAF
-        rjmp ENTER ; isTWIG
-        rjmp EXIT ; reserved
+;---------------------------------------------------------------------
+; those are checked first and directly
+;
+;        rjmp NOOP ; isNOOP
+;        rjmp CORE ; isLEAF
+;        rjmp ENTER ; isTWIG
+;        rjmp EXIT ; reserved
+
+;---------------------------------------------------------------------
+; those are reserved
+;
         rjmp RESET ; reserved
         rjmp CORE ; reserved
         rjmp CORE ; reserved
@@ -1595,7 +1599,6 @@ JUMPS:
 ;---------------------------------------------------------------------
 ;
 ; could change order
-; opcode 8, .. 255
 ;
 ;---------------------------------------------------------------------
 .balign 2
@@ -1618,8 +1621,8 @@ JUMPS:
         rjmp CMOVEGT 
         rjmp CORE 
         rjmp CTO 
-        rjmp DONEXT 
-        rjmp DOVAR 
+;        rjmp doNEXT 
+;        rjmp DOVAR 
         rjmp DROP 
         rjmp DSHL 
         rjmp DSHR 
@@ -1634,7 +1637,7 @@ JUMPS:
         rjmp INV 
         rjmp IOYO 
         rjmp KEYQM 
-        rjmp LITERAL 
+        rjmp LITL 
         rjmp LTHAN 
         rjmp MINUS 
         rjmp NEG 
@@ -1689,9 +1692,32 @@ LEAF 4, "CORE"
 CORE:
 ; trampoline
 
-; offset by multiply by 2
+; next instruction
 
         ipread r0
+
+; try  0, 1, 2, 3
+
+		dec r0		
+
+		brlt CORE	; equal to 0
+
+		dec r0
+
+		brlt CORE	; equal to 1
+
+		dec r0
+
+		brlt ENTER	; equal to 2
+		
+		breq EXIT	; equal to 3
+
+; next case
+;		inc r0
+;		inc r0
+;		inc r0
+		
+; offset by multiply by 2
 
         lsl r0
         rol r1
@@ -1720,14 +1746,14 @@ CORE:
 
 ;----------------------------------------------------------------------
 
-;#include "twigs.inc" 
-
-;----------------------------------------------------------------------
-
 #include "constants.inc" 
 
 ;----------------------------------------------------------------------
 
 #include "variables.inc" 
+
+;----------------------------------------------------------------------
+
+;#include "twigs.inc" 
 
 ;----------------------------------------------------------------------

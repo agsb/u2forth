@@ -25,140 +25,140 @@
 ;
 ;	creates forth variables, pushes the address
 ;
-TWIG 0, "BASE"
-;ISVARIABLE BASE
-.word LITERAL
-.word BASE
+TWIG 4, "BASE"
+BASE:
+.word LITL
+.word _BASE
 .word EXIT
 
-TWIG 0, "TIB"
-;ISVARIABLE TIB
-.word LITERAL
-.word TIB
+TWIG 3, "TIB"
+TIB:
+.word LITL
+.word _TIB
 .word EXIT
 
-TWIG 0, ">IN"
-;ISVARIABLE TIN
-.word LITERAL
-.word TIN
+TWIG 3, ">IN"
+TIN:
+.word LITL
+.word _TIN
 .word EXIT
 
-TWIG 0, "CUR"
-;ISVARIABLE CUR
-.word LITERAL
-.word CUR
+TWIG 3, "CUR"
+CUR:
+.word LITL
+.word _CUR
 .word EXIT
 
-TWIG 0, "CSP"
-;ISVARIABLE CSP
-.word LITERAL
-.word CSP
+TWIG 3, "CSP"
+CSP:
+.word LITL
+.word _CSP
 .word EXIT
 
-TWIG 0, "CONTEXT"
-;ISVARIABLE CONTEXT
-.word LITERAL
-.word CONTEXT
+TWIG 7, "CONTEXT"
+CONTEXT:
+.word LITL
+.word _CONTEXT
 .word EXIT
 
-TWIG 0, "CURRENT"
-;ISVARIABLE CURRENT
-.word LITERAL
-.word CURRENT
+TWIG 7, "CURRENT"
+CURRENT:
+.word LITL
+.word _CURRENT
 .word EXIT
 
-TWIG 0, "HANDLER"
-;ISVARIABLE HANDLER
-.word LITERAL
-.word HANDLER
+TWIG 7, "HANDLER"
+HANDLER:
+.word LITL
+.word _HANDLER
 .word EXIT
 
-TWIG 0, "HLD"
-;ISVARIABLE HLD
-.word LITERAL
-.word HLD
+TWIG 3, "HLD"
+HLD:
+.word LITL
+.word _HLD
 .word EXIT
 
-TWIG 0, "SPAN"
-;ISVARIABLE SPAN
-.word LITERAL
-.word SPAN
+TWIG 4, "SPAN"
+SPAN:
+.word LITL
+.word _SPAN
 .word EXIT
 
-TWIG 0, "SP0"
-;ISVARIABLE SP0
-.word LITERAL
-.word SP0
+TWIG 3, "SP0"
+SPZ:
+.word LITL
+.word _SP0
 .word EXIT
 
-TWIG 0, "RP0"
-;ISVARIABLE RP0
-.word LITERAL
-.word RP0
+TWIG 3, "RP0"
+RPZ:
+.word LITL
+.word _RP0
 .word EXIT
 
-TWIG 0, "UP"
-;ISVARIABLE UP
-.word LITERAL
-.word UP
+TWIG 2, "UP"
+UP:
+.word LITL
+.word _UP
 .word EXIT
 
-TWIG 0, "CP"
-;ISVARIABLE CP
-.word LITERAL
-.word CP
+TWIG 2, "CP"
+CP:
+.word LITL
+.word _CP
 .word EXIT
 
-TWIG 0, "STATE"
-;ISVARIABLE STATE
-.word LITERAL
-.word STATE
+TWIG 5, "STATE"
+STATE:
+.word LITL
+.word _STATE
 .word EXIT
 
-TWIG 0, "TIMER"
-;ISVARIABLE TIMER
-.word LITERAL
-.word TIMER
+TWIG 5, "TIMER"
+TIMER:
+.word LITL
+.word _TIMER
 .word EXIT
 
-TWIG 0, "LAST"
-;ISVARIABLE LAST
-.word LITERAL
-.word LAST
+TWIG 4, "LAST"
+LAST:
+.word LITL
+.word _LAST
 .word EXIT
 
 .section .data
 .global variables
-.org	0x0060
+#.org	0x0060
 variables:
 
-TIMER: .word 1		; 	16 bit counter miliseconds, linked to timer0 interrupt
-RANDW: .word 1		; 	16 bit seed for randow recursive
+_TIMER: .word 1		; 	16 bit counter miliseconds, linked to timer0 interrupt
+_RANDW: .word 1		; 	16 bit seed for randow recursive
 
-HLD: .word 1		;	pointer to buffer for number convertions
-SPAN: .word 1		;	number of characters in TIB
-TIN: .word 1		; 	>IN 	next character to be interpreted in TIB
-TIH: .word 1		;	#TIB 	number of characters in TIB
-TIT: .word 1		; 	'TIB	start terminal input buffer
-BASE: .word 1		; 	base for show numbers
-CONTEXT: .word 1	;	pointer to name field of last word in dictionary
-CURRENT: .word 1	;	pointer to name field of last word in vocaburary
-CP: .word 1			;	pointer to top free vocabulary
-UP: .word 1			; 	pointer to free user sram
-LAST: .word 1		;	pointer to name field of last word
-STATE: .word 1		;	state of $interpreter or $compiler
+_HLD: .word 1		;	pointer to buffer for number convertions
+_SPAN: .word 1		;	number of characters in TIB
+_TIN: .word 1		; 	>IN 	next character to be interpreted in TIB
+_TIH: .word 1		;	#TIB 	number of characters in TIB
+_TIB: .word 1		; 	'TIB	start terminal input buffer
 
-SP0: .word 1		; 	parameter stack
-RP0: .word 1		;	return stack
+_BASE: .word 1		; 	base for show numbers
+_CONTEXT: .word 1	;	pointer to name field of last word in dictionary
+_CURRENT: .word 1	;	pointer to name field of last word in vocaburary
+_CP: .word 1		;	pointer to top free vocabulary
+_UP: .word 1		; 	pointer to free user sram
+_LAST: .word 1		;	pointer to name field of last word
+_STATE: .word 1		;	state of $interpreter or $compiler
 
-TTEVAL: .word 1		;	reference to eval 
-TTABORT: .word 1	;	reference to abort
-TTKEYQM: .word 1	;	reference to key?
-TTEMITQM: .word 1	;	reference to emit?
+_SP0: .word 1		; 	parameter stack
+_RP0: .word 1		;	return stack
 
-CUR: .word 1		; 	current postion in TIB 
-CSP: .word 1		;
-HANDLER: .word 1	;
+_TTEVAL: .word 1		;	reference to eval 
+_TTABORT: .word 1	;	reference to abort
+_TTKEYQM: .word 1	;	reference to key?
+_TTEMITQM: .word 1	;	reference to emit?
 
+_CUR: .word 1		; 	current postion in TIB 
+_CSP: .word 1		;
 
+_HANDLER: .word 1	;	currenter handler for ?
 
