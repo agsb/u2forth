@@ -119,7 +119,7 @@ just dont compile by sdt
 ;
  .word  link     link to previous
  .byte  size     sizeof name OR mask 0x1F
- .ascii "name"   name
+ .ascii "name"   name, plus a byte 0 if size is odd
  .byte  opcode   opcode
  .word  param,   many
 
@@ -251,6 +251,15 @@ just dont compile by sdt
 ;
 		CELL_SZ = 2
 
+;---------------------------------------------------------------------
+;
+; default init cell
+;
+		_INIT = 200
+
+;----------------------------------------------------------------------
+;
+; version information
 ;----------------------------------------------------------------------
 ;
 ; version information
@@ -271,7 +280,6 @@ just dont compile by sdt
 .equ isNOOP, 0
 .equ isLEAF, 1
 .equ isTWIG, 2
-.equ isRESET, 3
 
 ;----------------------------------------------------------------------
 ;
@@ -285,6 +293,10 @@ just dont compile by sdt
 .set _LINK, _THIS 
 .byte \size
 .ascii "\name"
+;was odd, so we need to pad it
+.if ! ( \size & 1 ) 
+.byte 0
+.endif
 .byte isLEAF
 .balign 2
 .endm
@@ -301,6 +313,10 @@ just dont compile by sdt
 .set _LINK, _THIS 
 .byte \size
 .ascii "\name"
+;was odd, so we need to pad it
+.if ! ( \size & 1 ) 
+.byte 0
+.endif
 .byte isTWIG
 .balign 2
 .endm
@@ -427,35 +443,6 @@ TIM0_OVF:
 		reti
 
 ;----------------------------------------------------------------------
-;
-; start of dictionary
-;
-;----------------------------------------------------------------------
-
-;----------------------------------------------------------------------
-;
-; init instruction pointer and etc
-;
-        __SREG__ = 0x3f
-        __SP_H__ = 0x3e
-        __SP_L__ = 0x3d
-
-;----------------------------------------------------------------------
-; 
-LEAF 5, "RESET"
-RESET:
-; clear interrupts
-        cli
-; init _zero_as zero
-        eor _zero_, _zero_; exclusive or, xor
-        out __SREG__, _zero_; clear sreg
-; init real sp at end of sram
-        ldi wrk_high, hi8(SPP_TOP)
-        out __SP_H__, wrk_high
-        ldi wrk_low, lo8(SPP_TOP)
-        out __SP_L__, wrk_low
-
-;----------------------------------------------------------------------
 ; watch dogh
 ;	WDTCSR = bit (WDIE) | bit (WDP2) | bit (WDP1);    // set WDIE, and 1 second delay
 #define	WDIE	6
@@ -485,6 +472,35 @@ RESET:
 		sei
 
 ;----------------------------------------------------------------------
+;
+; start of dictionary
+;
+;----------------------------------------------------------------------
+
+;----------------------------------------------------------------------
+;
+; init instruction pointer and etc
+;
+        __SREG__ = 0x3f
+        __SP_H__ = 0x3e
+        __SP_L__ = 0x3d
+
+;----------------------------------------------------------------------
+; 
+LEAF 5, "RESET"
+RESET:
+; clear interrupts
+        cli
+; init _zero_as zero
+        eor _zero_, _zero_; exclusive or, xor
+        out __SREG__, _zero_; clear sreg
+; init real sp at end of sram
+        ldi wrk_high, hi8(SPP_TOP)
+        out __SP_H__, wrk_high
+        ldi wrk_low, lo8(SPP_TOP)
+        out __SP_L__, wrk_low
+
+;----------------------------------------------------------------------
 ; init instruction pointer and etc
 LEAF 3, "BYE"
 BYE:
@@ -492,10 +508,8 @@ BYE:
 
         eor tos_high, tos_high
         eor tos_low, tos_low
-
         eor nds_high, nds_high
         eor nds_low, nds_low
-
         eor wrk_high, wrk_high
         eor wrk_low, wrk_low
 
@@ -523,29 +537,22 @@ QUIT:
 ;
 ; init variables
 ;
-        rspush psp_low, psp_high
+; must point to real start
 
-        ldi zh, hi8(variables)
-        ldi zl, lo8(variables)
-        ldi xh, hi8(SRAM_START)
-        ldi xl, lo8(SRAM_START)
-_COPY:
-        ld _work_, Z+
-        st X+, r0
-        sbiw wrk_low, 1
-        brge _COPY
-
-        rspull psp_low, psp_high
-
-        ; must point to real start
-
-        ldi zh, hi8(variables)
-        ldi zl, lo8(variables)
+        ldi zh, hi8(_INIT)
+        ldi zl, lo8(_INIT)
         rjmp CORE
 
 ;----------------------------------------------------------------------
 ; start forth,
 ;----------------------------------------------------------------------
+
+;---------------------------------------------------------------------
+;
+;
+LEAF 4, "NOOP"
+NOOP:
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -603,13 +610,13 @@ LITL:
         movw nds_low, tos_low
         ipread tos_low
         ipread tos_high
-        rjmp EXIT
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ; get address of a variable ????
-;LEAF 4, "doVAR"
-;DOVAR:
-;		rjmp CORE
+LEAF 4, "doVAR"
+DOVAR:
+		rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -668,6 +675,28 @@ GOES:
         movw zl, wrk_low
         rjmp CORE
 
+
+;---------------------------------------------------------------------
+;
+; read a opcode in [ip]
+;
+LEAF 4, "CORE"
+CORE:
+
+; next instruction
+
+        ipread r0
+
+; try  0, 1, 2, 3
+
+		dec r0		
+		dec r0
+		brlt CORE	; equal to 0 or 1
+		breq ENTER	; equal to 2
+		dec r0
+		breq EXIT	; equal to 3
+		rjmp _CORE
+
 ;----------------------------------------------------------------------
 ; ok 2drop
 LEAF 5, "2DROP"
@@ -682,6 +711,27 @@ LEAF 4, "2DUP"
 TWODUP:
         pspush nds_low, nds_high
         pspush tos_low, tos_high
+        rjmp CORE
+
+;----------------------------------------------------------------------
+; ok 2swap ( a b c d -- c d a b )
+LEAF 4, "2SWAP"
+TWOSWAP:
+; get b
+		pspull wrk_low, wrk_high
+		rspush wrk_low, wrk_high
+; get a
+		pspull wrk_low, wrk_high
+		rspush wrk_low, wrk_high
+; put c
+        pspush nds_low, nds_high
+; put d 
+        pspush tos_low, tos_high
+; get a 
+		rspull nds_low, nds_high
+; get b
+		rspull tos_low, tos_high
+
         rjmp CORE
 
 ;----------------------------------------------------------------------
@@ -1128,6 +1178,337 @@ _CMOVEGT2:
 
         rjmp TRIDROP
 
+
+
+;----------------------------------------------------------------------
+;
+; ok ALIGN, easy as cell is 2 bytes
+; if lsb set sum 1
+;
+LEAF 5, "ALIGN"
+ALLIGN:
+		movw wrk_low, tos_low
+		adiw wrk_low, 1
+		movw tos_low, wrk_low
+        lsr tos_low
+        lsl tos_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+;
+; ok CELL is 2 ; size of a cell
+;
+LEAF 2, "CELL"
+CELLSZ:
+        ldi wrk_low, CELL_SZ
+        eor wrk_high, wrk_high
+        rjmp PUSHS
+
+;----------------------------------------------------------------------
+;
+; ok CELL is 2, multiply by 2
+;
+LEAF 5, "CELLS"
+CELLS:
+        rjmp SHL
+
+;----------------------------------------------------------------------
+;
+; ok CELL is 2 bytes, add 2
+;
+LEAF 5, "CELL+"
+CELLPLUS:
+        movw wrk_low, tos_low
+        adiw wrk_low, CELL_SZ
+        movw tos_low, wrk_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+;
+; ok CELL is 2 bytes, sub 2
+;
+LEAF 5, "CELL-"
+CELLMINUS:
+        movw wrk_low, tos_low
+        sbiw wrk_low, CELL_SZ
+        movw tos_low, wrk_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+;
+;
+LEAF 5, "1+"
+ONEPLUS:
+        movw wrk_low, tos_low
+        adiw wrk_low, 1
+        movw tos_low, wrk_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+;
+LEAF 2, "1-"
+ONEMINUS:
+        movw wrk_low, tos_low
+        sbiw wrk_low, 1
+        movw tos_low, wrk_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+; ????
+LEAF 6, "BITSCLEAR"
+BITSCLEAR:
+        com nds_low
+        com nds_high
+        rjmp AND
+
+;----------------------------------------------------------------------
+; ????
+LEAF 6, "BITSSET"
+BITSSET:
+        com nds_low
+        com nds_high
+        rjmp AND
+
+;----------------------------------------------------------------------
+; ????
+LEAF 6, "BITSTOGGLE"
+BITSTOGGLE:
+        com nds_low
+        com nds_high
+        rjmp AND
+
+;----------------------------------------------------------------------
+; ????
+LEAF 3, "D2/"
+DSHR:
+        lsr nds_low
+        ror nds_high
+        ror tos_low
+        ror tos_high
+        rjmp CORE
+
+;----------------------------------------------------------------------
+; ????
+LEAF 3, "D2*"
+DSHL:
+        lsl nds_low
+        rol nds_high
+        rol tos_low
+        rol tos_high
+        rjmp CORE
+
+;----------------------------------------------------------------------
+; ????
+;
+; http://www.avr-asm-tutorial.net/avr_en/apps/random_tn13/random_calc_tn13.html
+;
+;	good seeds
+;
+;	B167 4A3C 9879 B61E 7B26 
+;	A858 1F88 50D5 419D 5537
+;	0224 0527 5EB6 1E6D BCDC
+;	92FF C206 0ECD 9361 2823
+;	BE0B B303 6462 0E4C 3D24
+;
+LEAF 3, "RND"
+RND:
+;	load seed
+		lds wrk_low, _RANDW
+		lds wrk_high, _RANDW + 1
+;
+;	run magics
+;
+		eor	wrk_low, wrk_high
+		swap wrk_low
+		add wrk_high, wrk_low
+
+;	save seed
+		sts _RANDW, wrk_low
+		sts _RANDW + 1, wrk_high
+;
+		rjmp PUSHS
+	
+;----------------------------------------------------------------------
+;
+; trampoline for 127 primitives
+;
+;----------------------------------------------------------------------
+;
+; order IS opcode sequence
+;
+;---------------------------------------------------------------------
+JUMPS:
+
+;---------------------------------------------------------------------
+;
+; do not change order, hard coded in macros
+; opcode 0, 1, 2, 3, 4, 5, 6, 7
+;
+;---------------------------------------------------------------------
+.balign 2
+
+;---------------------------------------------------------------------
+; those are checked first and directly
+;
+;        rjmp NOOP ; isNOOP
+;        rjmp CORE ; isLEAF
+;        rjmp ENTER ; isTWIG
+;        rjmp EXIT ; reserved
+
+;---------------------------------------------------------------------
+; those are reserved
+;
+        rjmp RESET ; reserved
+        rjmp CORE ; reserved
+        rjmp CORE ; reserved
+        rjmp CORE ; reserved
+
+;---------------------------------------------------------------------
+;
+; could change order
+;
+;---------------------------------------------------------------------
+.balign 2
+
+        rjmp ABORT 
+        rjmp ALLIGN 
+        rjmp AND 
+        rjmp AT 
+        rjmp BITSCLEAR 
+        rjmp BITSSET 
+        rjmp BITSTOGGLE 
+        rjmp BRANCH 
+        rjmp BYE 
+        rjmp CAT 
+        rjmp CELLMINUS 
+        rjmp CELLPLUS 
+        rjmp CELLS 
+        rjmp CELLSZ 
+        rjmp CMOVE 
+        rjmp CMOVEGT 
+        rjmp CTO 
+;        rjmp DOVAR 
+        rjmp DROP 
+        rjmp DSHL 
+        rjmp DSHR 
+        rjmp DUP 
+        rjmp EMITQM 
+        rjmp EQUAL 
+        rjmp EXEC 
+        rjmp GTHAN 
+        rjmp GTR 
+        rjmp INV 
+        rjmp IOYO 
+        rjmp KEYQM 
+        rjmp LITL 
+        rjmp LTHAN 
+        rjmp MINUS 
+        rjmp NEG 
+        rjmp NOOP 
+        rjmp ONEMINUS 
+        rjmp ONENEG 
+        rjmp ONEPLUS 
+        rjmp OR 
+        rjmp OVER 
+        rjmp PLUS 
+        rjmp PLUSTO 
+        rjmp PSAT 
+        rjmp PSTO 
+        rjmp PUSHS 
+        rjmp QMBRANCH 
+        rjmp QMDUP 
+        rjmp QUIT 
+        rjmp RAT 
+        rjmp RGT 
+        rjmp ROT 
+        rjmp RSAT 
+        rjmp RSTO 
+        rjmp SDIV 
+        rjmp SHL 
+        rjmp SHR 
+        rjmp SMUL 
+        rjmp SWAP 
+        rjmp TO 
+        rjmp TWODROP 
+        rjmp TWODUP 
+        rjmp TWOSWAP
+        rjmp UMBYMOD 
+        rjmp UMUL 
+        rjmp UPLUS 
+        rjmp XOR 
+        rjmp ZERO 
+        rjmp ZEROEQ 
+        rjmp ZEROGT 
+        rjmp ZEROLT 
+
+;;---------------------------------------------------------------------
+;;
+;;
+;LEAF 4, "NOOP"
+;NOOP:
+;        rjmp CORE
+;
+;;---------------------------------------------------------------------
+;;
+;; read a opcode in [ip]
+;;
+;LEAF 4, "CORE"
+;CORE:
+;
+;; next instruction
+;
+;        ipread r0
+;
+;; try  0, 1, 2, 3
+;
+;		dec r0		
+;		dec r0
+;		brlt CORE	; equal to 0 or 1
+;		breq _CORE2	; equal to 2
+;		dec r0
+;		breq _CORE3	; equal to 3
+;		rjmp _CORE
+;_CORE2:
+;		rjmp ENTER
+;_CORE3:
+;		rjmp EXIT
+;
+;
+;---------------------------------------------------------------------
+;
+_CORE:
+; next case
+;		inc r0
+;		inc r0
+;		inc r0
+		
+; offset by multiply by 2
+
+        lsl r0
+        rol r1
+
+; load table address
+
+        ldi wrk_low, lo8(JUMPS)
+        ldi wrk_high, hi8(JUMPS)
+
+; take offset
+
+        add wrk_low, r0
+        adc wrk_high, r1
+
+; pseudo
+
+        push wrk_low
+        push wrk_high
+        ret
+
+;---------------------------------------------------------------------
+;
+; end trampoline
+;
+;----------------------------------------------------------------------
+
 ;----------------------------------------------------------------------
 ;
 ; 	"div16u" - 16/16 Bit Unsigned Division
@@ -1367,155 +1748,6 @@ m16ures:
 
 ;----------------------------------------------------------------------
 
-
-;----------------------------------------------------------------------
-;
-; ok ALIGN, easy as cell is 2 bytes
-; if lsb set sum 1
-;
-LEAF 5, "ALIGN"
-ALLIGN:
-		movw wrk_low, tos_low
-		adiw wrk_low, 1
-		movw tos_low, wrk_low
-        lsr tos_low
-        lsl tos_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-;
-; ok CELL is 2 ; size of a cell
-;
-LEAF 2, "CELL"
-CELLSZ:
-        ldi wrk_low, CELL_SZ
-        eor wrk_high, wrk_high
-        rjmp PUSHS
-
-;----------------------------------------------------------------------
-;
-; ok CELL is 2, multiply by 2
-;
-LEAF 5, "CELLS"
-CELLS:
-        rjmp SHL
-
-;----------------------------------------------------------------------
-;
-; ok CELL is 2 bytes, add 2
-;
-LEAF 5, "CELL+"
-CELLPLUS:
-        movw wrk_low, tos_low
-        adiw wrk_low, CELL_SZ
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-;
-; ok CELL is 2 bytes, sub 2
-;
-LEAF 5, "CELL-"
-CELLMINUS:
-        movw wrk_low, tos_low
-        sbiw wrk_low, CELL_SZ
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-;
-;
-LEAF 5, "1+"
-ONEPLUS:
-        movw wrk_low, tos_low
-        adiw wrk_low, 1
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-;
-LEAF 2, "1-"
-ONEMINUS:
-        movw wrk_low, tos_low
-        sbiw wrk_low, 1
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-; ????
-LEAF 6, "BITSCLEAR"
-BITSCLEAR:
-        com nds_low
-        com nds_high
-        rjmp AND
-
-;----------------------------------------------------------------------
-; ????
-LEAF 6, "BITSSET"
-BITSSET:
-        com nds_low
-        com nds_high
-        rjmp AND
-
-;----------------------------------------------------------------------
-; ????
-LEAF 6, "BITSTOGGLE"
-BITSTOGGLE:
-        com nds_low
-        com nds_high
-        rjmp AND
-
-;----------------------------------------------------------------------
-; ????
-LEAF 3, "D2/"
-DSHR:
-        lsr nds_low
-        ror nds_high
-        ror tos_low
-        ror tos_high
-        rjmp CORE
-
-;----------------------------------------------------------------------
-; ????
-LEAF 3, "D2*"
-DSHL:
-        lsl nds_low
-        rol nds_high
-        rol tos_low
-        rol tos_high
-        rjmp CORE
-
-;----------------------------------------------------------------------
-; ????
-;
-; http://www.avr-asm-tutorial.net/avr_en/apps/random_tn13/random_calc_tn13.html
-;
-;	good seeds
-;
-;	B167 4A3C 9879 B61E 7B26 
-;	A858 1F88 50D5 419D 5537
-;	0224 0527 5EB6 1E6D BCDC
-;	92FF C206 0ECD 9361 2823
-;	BE0B B303 6462 0E4C 3D24
-;
-LEAF 3, "RND"
-RND:
-;	load seed
-		lds wrk_low, _RANDW
-		lds wrk_high, _RANDW + 1
-;
-;	run magics
-;
-		eor	wrk_low, wrk_high
-		swap wrk_low
-		add wrk_high, wrk_low
-
-;	save seed
-		sts _RANDW, wrk_low
-		sts _RANDW + 1, wrk_high
-;
-		rjmp PUSHS
-
 ;----------------------------------------------------------------------
 ;*************************************************************************
 ;*                                                                       *
@@ -1560,191 +1792,6 @@ _bcd4:  dec     r17
         subi    r16, -'0'
         ret
 ;---------------------------------------------------------------------
-	
-;----------------------------------------------------------------------
-;
-; trampoline for 127 primitives
-;
-;----------------------------------------------------------------------
-;
-; order IS opcode sequence
-;
-;---------------------------------------------------------------------
-JUMPS:
-
-;---------------------------------------------------------------------
-;
-; do not change order, hard coded in macros
-; opcode 0, 1, 2, 3, 4, 5, 6, 7
-;
-;---------------------------------------------------------------------
-.balign 2
-
-;---------------------------------------------------------------------
-; those are checked first and directly
-;
-;        rjmp NOOP ; isNOOP
-;        rjmp CORE ; isLEAF
-;        rjmp ENTER ; isTWIG
-;        rjmp EXIT ; reserved
-
-;---------------------------------------------------------------------
-; those are reserved
-;
-        rjmp RESET ; reserved
-        rjmp CORE ; reserved
-        rjmp CORE ; reserved
-        rjmp CORE ; reserved
-
-;---------------------------------------------------------------------
-;
-; could change order
-;
-;---------------------------------------------------------------------
-.balign 2
-
-        rjmp ABORT 
-        rjmp ALLIGN 
-        rjmp AND 
-        rjmp AT 
-        rjmp BITSCLEAR 
-        rjmp BITSSET 
-        rjmp BITSTOGGLE 
-        rjmp BRANCH 
-        rjmp BYE 
-        rjmp CAT 
-        rjmp CELLMINUS 
-        rjmp CELLPLUS 
-        rjmp CELLS 
-        rjmp CELLSZ 
-        rjmp CMOVE 
-        rjmp CMOVEGT 
-        rjmp CORE 
-        rjmp CTO 
-;        rjmp doNEXT 
-;        rjmp DOVAR 
-        rjmp DROP 
-        rjmp DSHL 
-        rjmp DSHR 
-        rjmp DUP 
-        rjmp EMITQM 
-        rjmp ENTER 
-        rjmp EQUAL 
-        rjmp EXEC 
-        rjmp EXIT 
-        rjmp GTHAN 
-        rjmp GTR 
-        rjmp INV 
-        rjmp IOYO 
-        rjmp KEYQM 
-        rjmp LITL 
-        rjmp LTHAN 
-        rjmp MINUS 
-        rjmp NEG 
-        rjmp NOOP 
-        rjmp ONEMINUS 
-        rjmp ONENEG 
-        rjmp ONEPLUS 
-        rjmp OR 
-        rjmp OVER 
-        rjmp PLUS 
-        rjmp PLUSTO 
-        rjmp PSAT 
-        rjmp PSTO 
-        rjmp PUSHS 
-        rjmp QMBRANCH 
-        rjmp QMDUP 
-        rjmp QUIT 
-        rjmp RAT 
-        rjmp RGT 
-        rjmp ROT 
-        rjmp RSAT 
-        rjmp RSTO 
-        rjmp SDIV 
-        rjmp SHL 
-        rjmp SHR 
-        rjmp SMUL 
-        rjmp SWAP 
-        rjmp TO 
-        rjmp TWODROP 
-        rjmp TWODUP 
-        rjmp UMBYMOD 
-        rjmp UMUL 
-        rjmp UPLUS 
-        rjmp XOR 
-        rjmp ZERO 
-        rjmp ZEROEQ 
-        rjmp ZEROGT 
-        rjmp ZEROLT 
-
-;---------------------------------------------------------------------
-;
-;
-LEAF 4, "NOOP"
-NOOP:
-        rjmp CORE
-
-;---------------------------------------------------------------------
-;
-; read a opcode in [ip]
-;
-LEAF 4, "CORE"
-CORE:
-; trampoline
-
-; next instruction
-
-        ipread r0
-
-; try  0, 1, 2, 3
-
-		dec r0		
-
-		brlt CORE	; equal to 0
-
-		dec r0
-
-		brlt CORE	; equal to 1
-
-		dec r0
-
-		brlt ENTER	; equal to 2
-		
-		breq EXIT	; equal to 3
-
-; next case
-;		inc r0
-;		inc r0
-;		inc r0
-		
-; offset by multiply by 2
-
-        lsl r0
-        rol r1
-
-; load table address
-
-        ldi wrk_low, lo8(JUMPS)
-        ldi wrk_high, hi8(JUMPS)
-
-; take offset
-
-        add wrk_low, r0
-        adc wrk_high, r1
-
-; pseudo
-
-        push wrk_low
-        push wrk_high
-        ret
-
-;---------------------------------------------------------------------
-;
-; end trampoline
-;
-;----------------------------------------------------------------------
-
-;----------------------------------------------------------------------
 
 #include "constants.inc" 
 

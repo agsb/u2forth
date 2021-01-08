@@ -43,46 +43,49 @@
 */
 
 
-		NL = 0		;  	\0	null
-        BE = 7		;	^g	\a	bell mark
-        BS = 8		;	^h	\b	backspace
-        TB = 9		;	^i	\t	horizontal tab
-        LF = 10		;	^j	\n	line feed
-        VT = 11		;	^v	\v	ivertical tab
-        FF = 12		;	^l	\f	form feed
-		CR = 13		;	^m	\r	carriage return
-        ES = 27		;	^[	\e	escape
+		NIL = 0		;  	\0	null
+        _BL = 7		;	^g	\a	bell mark
+        _BS = 8		;	^h	\b	backspace
+        _TB = 9		;	^i	\t	horizontal tab
+        _LF = 10		;	^j	\n	line feed
+        _VT = 11		;	^v	\v	vertical tab
+        _FF = 12		;	^l	\f	form feed
+		_CR = 13		;	^m	\r	carriage return
+		_CN = 24		;   cancel
+        _ES = 27		;	^[	\e	escape
 
-		BL = 32		;	space blank character
-		QK = 34		;	" quotation mark
-		BH = 92		;	\ backslash
-		OP = 40		; 	( open
-		CP = 41		;   ) close
+		_BL = 32		;	space blank character
+		_QK = 34		;	" quotation mark
+		_OP = 40		; 	( open
+		_CP = 41		;   ) close
+		_BH = 92		;	\ backslash
+		_US = 95		;	_ underscore
 
 ;----------------------------------------------------------------------
-;       NL = 0		;	0	\0	null
-TWIG 2, "NL"
-NL:
+;       NIL = 0		;	0	\0	null
+TWIG 2, "NIL"
+NULL:
 .word	LITL
-.byte	NL
-.byte	NL
+.byte	NIL
+.byte	NIL
 .word	EXIT	;	exit
 		
 ;----------------------------------------------------------------------
-;       BE = 7		;	^g	\a	bell mark
+;      BELL = 7		;	^g	\a	bell mark
 ;TWIG 2, "BE"
+BE:
 ;.word	LITL
-;.byte	BE
-;.byte	NL
+;.byte	_BE
+;.byte	NIL
 ;.word	EXIT	;	exit
 		
 ;----------------------------------------------------------------------
-;       BS = 8		;	^h	\b	backspace
+;      BSC = 8		;	^h	\b	backspace
 TWIG 2, "BS"
 BS:
 .word	LITL
-.byte	BS
-.byte	NL
+.byte	_BS
+.byte	NIL
 .word	EXIT	;	exit
 		
 ;----------------------------------------------------------------------
@@ -90,8 +93,8 @@ BS:
 TWIG 2, "TB"
 TB:
 .word	LITL
-.byte	TB
-.byte	NL
+.byte	_TB
+.byte	NIL
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
@@ -99,50 +102,53 @@ TB:
 TWIG 2, "LF"
 LF:
 .word	LITL
-.byte	LF
-.byte	NL
+.byte	_LF
+.byte	NIL
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;       VT = 11		;	^v	\v	vertical tab
 ;TWIG 2, "VT"
-;.word	LITL
-;.byte	VT
-;.byte	NL
-;.word	EXIT	;	exit
+VT:
+.word	LITL
+.byte	_VT
+.byte	NIL
+.word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;       FF = 12		;	^l	\f	form feed, Ctrl-Enter
 ;TWIG 2, "FF"
-;.word	LITL
-;.byte	FF
-;.byte	NL
-;.word	EXIT	;	exit
+FF:
+.word	LITL
+.byte	_FF
+.byte	NIL
+.word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;       CR = 13		;	^m	\r	carriage return
 TWIG 2, "CR"
 CR:
 .word	LITL
-.byte	CR
-.byte	NL
+.byte	_CR
+.byte	NIL
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;       CN = 24		;	CANCEL
 ;TWIG 2, "CN"
-;.word	LITL
-;.byte	CN
-;.byte	NL
-;.word	EXIT	;	exit
+CN:
+.word	LITL
+.byte	_CN
+.byte	NIL
+.word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
 ;       ES = 27		;	^[	\e	escape
 ;TWIG 2, "ES"
 ES:
 .word	LITL
-.byte	ES
-.byte	NL
+.byte	_ES
+.byte	NIL
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
@@ -150,8 +156,8 @@ ES:
 TWIG 2, "BL"
 BL:
 .word	LITL
-.byte	BL
-.byte	NL
+.byte	_BL
+.byte	NIL
 .word	EXIT	;	exit
 
 ;----------------------------------------------------------------------
