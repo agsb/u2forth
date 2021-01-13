@@ -33,6 +33,7 @@ just dont compile by sdt
 #include <avr/eeprom.h>
 #include <avr/wdt.h>
 */
+
 ;----------------------------------------------------------------------
 ;
 ; 02/12/2020
@@ -54,66 +55,7 @@ just dont compile by sdt
  
   still no multitasks
  
-  forth for ATMEGA8, 8k flash, 1k SRAM,
-  internal clock 8 MHz, USART 9600,8,N,1
- 
-  using GCC avr-as -mmcu=atmega8
- 
-  vide https://www.ic.unicamp.br/~celio/mc404-2014/docs/gnu-arm-directives.pdf
- 
-  on a 8 MHz clock frequency, one instruction cycle requires 1/8 us or 125 ns
- 
-  "The job isn't over until the paperwork is done."
- 
-  "The first register is always the target register !"
- 
-  .equ assign a constant value to a label
- 
-  .set assign a variable value to a label
- 
-  .rept number \n codes \n .endr ; repeats "codes" number times
- 
-		
-		1.   System dictionary space used in bytes 
 
-      	2.   Application dictionary space available in bytes 
-
-      	3.   Data space in bytes 
-
-      	4.   Return stack space in bytes 
- 
- FORTH event loop is COLD-->QUIT-->BEGIN-QUERY-EVAL-AGAIN
- 
- stacks are last in first out, LIFO
- 
- POP == .SP + 1;
- PSH == .SP - 1;
- 
- convention for translate forth names to assembler names
- 
- use LE for <=
- use GT for >=
- use NE for <>
- use LT for <
- use GT for >
- use EQ for =
- use TK for '
- 
- use MUL for *
- use DIV for /
- use PLUS for +
- use MINUS for -
- 
- use BY for /
- use QM for ?
- use AT for @
- use TO for !
- use ZERO for 0
- use ONE for 1
- use TWO for 2
- 
-	use name between parentesis (name) for internal use of forth
- 
 ;----------------------------------------------------------------------
 ; dictionary structure
 ;
@@ -124,6 +66,19 @@ just dont compile by sdt
  .word  param,   many
 
 ;----------------------------------------------------------------------
+
+12/01/2021
+	moved some documentation to howto.inc
+	rewrote internal interpreter for core, enter, exit,
+	new core for 0, 1, 2, 3, opcodes and new _core for other opcodes as trampoline
+	need move leafs to big table with fixed opcodes 
+	need move all assembler to this file
+
+08/01/2021	
+	rewrote for all primitive ends with EXIT not CORE
+	this permit that all words at table, twigs or leaves, runs with same end code
+	
+
 
 */
 
@@ -194,8 +149,7 @@ just dont compile by sdt
 #define         tos_high    r21    
 ;.set	th,	r21
 
-;----------------------------------------------------------------------
-;
+;----------------------------------------------------------------------;
 ; assign stacks address
 ; for atmega8
 ;
@@ -291,67 +245,6 @@ just dont compile by sdt
 .set _THIS, .
 .word _LINK
 .set _LINK, _THIS 
-.byte \size
-.ascii "\name"
-;was odd, so we need to pad it
-.if ! ( \size & 1 ) 
-.byte 0
-.endif
-.byte isLEAF
-.balign 2
-.endm
-
-;----------------------------------------------------------------------
-;
-; header of word in dictionary
-; opcode for TWIG ( as colon )
-; must end with EXIT :)
-;
-.macro TWIG size , name
-.set _THIS, .
-.word _LINK
-.set _LINK, _THIS 
-.byte \size
-.ascii "\name"
-;was odd, so we need to pad it
-.if ! ( \size & 1 ) 
-.byte 0
-.endif
-.byte isTWIG
-.balign 2
-.endm
-
-;----------------------------------------------------------------------
-.macro rspush low , high
-        st -Y , \low
-        st -Y , \high
-.endm
-
-;----------------------------------------------------------------------
-.macro rspull low , high
-        ld \high , Y+
-        ld \low , Y+
-.endm
-
-;----------------------------------------------------------------------
-.macro pspush low , high
-        st -X , \low
-        st -X , \high
-.endm
-
-;----------------------------------------------------------------------
-.macro pspull low , high
-        ld \high , X+
-        ld \low , X+
-.endm
-
-;----------------------------------------------------------------------
-; also io@
-.macro peek byte , address
-        .if (\address < $40)
-         in \byte , \address
-        .else
-         lds \byte , \address
         .endif
 .endm
 
@@ -1122,11 +1015,6 @@ _CMOVE2:
         ; restore psp from rsp
         rspull psp_low, psp_high
 
-TRIDROP:
-        ; drop arguments
-        adiw xl, 1
-        rjmp TWODROP
-
 ;----------------------------------------------------------------------
 ; CMOVE> copy from source+w to destination+w, decrease w
 LEAF 5, "CMOVE>"
@@ -1178,8 +1066,6 @@ _CMOVEGT2:
 
         rjmp TRIDROP
 
-
-
 ;----------------------------------------------------------------------
 ;
 ; ok ALIGN, easy as cell is 2 bytes
@@ -1229,69 +1115,6 @@ CELLPLUS:
 ;
 LEAF 5, "CELL-"
 CELLMINUS:
-        movw wrk_low, tos_low
-        sbiw wrk_low, CELL_SZ
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-;
-;
-LEAF 5, "1+"
-ONEPLUS:
-        movw wrk_low, tos_low
-        adiw wrk_low, 1
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-;
-LEAF 2, "1-"
-ONEMINUS:
-        movw wrk_low, tos_low
-        sbiw wrk_low, 1
-        movw tos_low, wrk_low
-        rjmp CORE
-
-;----------------------------------------------------------------------
-; ????
-LEAF 6, "BITSCLEAR"
-BITSCLEAR:
-        com nds_low
-        com nds_high
-        rjmp AND
-
-;----------------------------------------------------------------------
-; ????
-LEAF 6, "BITSSET"
-BITSSET:
-        com nds_low
-        com nds_high
-        rjmp AND
-
-;----------------------------------------------------------------------
-; ????
-LEAF 6, "BITSTOGGLE"
-BITSTOGGLE:
-        com nds_low
-        com nds_high
-        rjmp AND
-
-;----------------------------------------------------------------------
-; ????
-LEAF 3, "D2/"
-DSHR:
-        lsr nds_low
-        ror nds_high
-        ror tos_low
-        ror tos_high
-        rjmp CORE
-
-;----------------------------------------------------------------------
-; ????
-LEAF 3, "D2*"
-DSHL:
-        lsl nds_low
         rol nds_high
         rol tos_low
         rol tos_high
@@ -1350,10 +1173,10 @@ JUMPS:
 ;---------------------------------------------------------------------
 ; those are checked first and directly
 ;
-;        rjmp NOOP ; isNOOP
-;        rjmp CORE ; isLEAF
-;        rjmp ENTER ; isTWIG
-;        rjmp EXIT ; reserved
+;        rjmp NOOP ; 
+;        rjmp CORE ; 
+;        rjmp ENTER ; 
+;        rjmp EXIT ; 
 
 ;---------------------------------------------------------------------
 ; those are reserved
@@ -1441,46 +1264,11 @@ JUMPS:
         rjmp ZEROGT 
         rjmp ZEROLT 
 
-;;---------------------------------------------------------------------
-;;
-;;
-;LEAF 4, "NOOP"
-;NOOP:
-;        rjmp CORE
-;
-;;---------------------------------------------------------------------
-;;
-;; read a opcode in [ip]
-;;
-;LEAF 4, "CORE"
-;CORE:
-;
-;; next instruction
-;
-;        ipread r0
-;
-;; try  0, 1, 2, 3
-;
-;		dec r0		
-;		dec r0
-;		brlt CORE	; equal to 0 or 1
-;		breq _CORE2	; equal to 2
-;		dec r0
-;		breq _CORE3	; equal to 3
-;		rjmp _CORE
-;_CORE2:
-;		rjmp ENTER
-;_CORE3:
-;		rjmp EXIT
-;
-;
 ;---------------------------------------------------------------------
 ;
+; check in CORE have 3 dec
+;
 _CORE:
-; next case
-;		inc r0
-;		inc r0
-;		inc r0
 		
 ; offset by multiply by 2
 
@@ -1804,3 +1592,66 @@ _bcd4:  dec     r17
 ;#include "twigs.inc" 
 
 ;----------------------------------------------------------------------
+
+/*
+ *  DISCLAIMER:
+ *
+ *  Copyright © 2020, Alvaro Barcellos,
+ *  Permission is hereby granted, free of charge, to any person obtaining
+ *  a copy of this software and associated documentation files (the
+ *  "Software"), to deal in the Software without restriction, including
+ *  without limitation the rights to use, copy, modify, merge, publish,
+ *  distribute, sublicense, and/or sell copies of the Software, and to
+ *  permit persons to whom the Software is furnished to do so, subject to
+ *  the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be
+ *  included in all copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ *  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ *  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ *  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ *  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+*/
+
+/* get some magic constants */
+
+#include <avr/io.h>
+
+/*
+just dont compile by sdt
+#include <avr/eeprom.h>
+#include <avr/wdt.h>
+*/
+
+;----------------------------------------------------------------------
+;
+; 02/12/2020
+;
+; Alvaro Gomes Sobral Barcellos
+;
+; u2forth
+;
+
+/*
+
+  inspired on eforth from books and papers from C. H. Ting
+ 
+  just experience for small microcontrolers
+ 
+  emulates a virtual uCi, really, really, just using SEG and PC, ((0x3D) + 0x20) is reserved for interrups (future)
+ 
+
+;----------------------------------------------------------------------
+
+12/01/2021
+	documentation in howto.inc 
+	internal interpreter core, branch, qbranch, enter, exit	rewrited
+	optimized core for 0, 1, 2, 3, and other opcodes in trampoline
+
+08/01/2021	
+	rewrote for all primitive ends with EXIT not CORE
