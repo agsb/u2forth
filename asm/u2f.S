@@ -55,7 +55,6 @@ just dont compile by sdt
  
   still no multitasks
  
-
 ;----------------------------------------------------------------------
 ; dictionary structure
 ;
@@ -66,6 +65,9 @@ just dont compile by sdt
  .word  param,   many
 
 ;----------------------------------------------------------------------
+
+22/01/2021
+	maybe include DEFER and IS
 
 12/01/2021
 	moved some documentation to howto.inc
@@ -161,10 +163,8 @@ just dont compile by sdt
 ;
 ; default sizes forth83
 		SPU_SIZE = 32
-
         PSP_SIZE = 64
 		RSP_SIZE = 48
-
 		TIB_SIZE = 80
 		PAD_SIZE = 84
 
@@ -207,7 +207,7 @@ just dont compile by sdt
 
 ;---------------------------------------------------------------------
 ;
-; default init cell
+; default init cell, ????
 ;
 		_INIT = 200
 
@@ -245,6 +245,67 @@ just dont compile by sdt
 .set _THIS, .
 .word _LINK
 .set _LINK, _THIS 
+.byte \size
+.ascii "\name"
+;was odd, so we need to pad it
+.if ! ( \size & 1 ) 
+.byte 0
+.endif
+.byte isLEAF
+.balign 2
+.endm
+
+;----------------------------------------------------------------------
+;
+; header of word in dictionary
+; opcode for TWIG ( as colon )
+; must end with EXIT :)
+;
+.macro TWIG size , name
+.set _THIS, .
+.word _LINK
+.set _LINK, _THIS 
+.byte \size
+.ascii "\name"
+;was odd, so we need to pad it
+.if ! ( \size & 1 ) 
+.byte 0
+.endif
+.byte isTWIG
+.balign 2
+.endm
+
+;----------------------------------------------------------------------
+.macro rspush low , high
+        st -Y , \low
+        st -Y , \high
+.endm
+
+;----------------------------------------------------------------------
+.macro rspull low , high
+        ld \high , Y+
+        ld \low , Y+
+.endm
+
+;----------------------------------------------------------------------
+.macro pspush low , high
+        st -X , \low
+        st -X , \high
+.endm
+
+;----------------------------------------------------------------------
+.macro pspull low , high
+        ld \high , X+
+        ld \low , X+
+.endm
+
+;----------------------------------------------------------------------
+; also io@
+.macro peek byte , address
+        .if (\address < $40)
+         in \byte , \address
+        .else
+         lds \byte , \address
         .endif
 .endm
 
@@ -428,7 +489,7 @@ QUIT:
 
 ;----------------------------------------------------------------------
 ;
-; init variables
+; init variables ????
 ;
 ; must point to real start
 
@@ -568,7 +629,6 @@ GOES:
         movw zl, wrk_low
         rjmp CORE
 
-
 ;---------------------------------------------------------------------
 ;
 ; read a opcode in [ip]
@@ -590,6 +650,11 @@ CORE:
 		breq EXIT	; equal to 3
 		rjmp _CORE
 
+;----------------------------------------------------------------------
+TRIDROP:
+; ok drop
+        ; drop arguments
+        adiw xl, 1
 ;----------------------------------------------------------------------
 ; ok 2drop
 LEAF 5, "2DROP"
@@ -827,6 +892,49 @@ FTRUE:
         ser wrk_low
         ser wrk_high
         rjmp PUSHS
+;----------------------------------------------------------------------
+;
+;	ok 
+LEAF 5, "1+"
+ONEPLUS:
+        movw wrk_low, tos_low
+        adiw wrk_low, 1
+        movw tos_low, wrk_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+;
+;	ok
+LEAF 2, "1-"
+ONEMINUS:
+        movw wrk_low, tos_low
+        sbiw wrk_low, 1
+        movw tos_low, wrk_low
+        rjmp CORE
+
+;----------------------------------------------------------------------
+; ????
+LEAF 8, "BITSCLEAR"
+BITSCLEAR:
+        com nds_low
+        com nds_high
+        rjmp AND
+
+;----------------------------------------------------------------------
+; ????
+LEAF 7, "BITSSET"
+BITSSET:
+        com nds_low
+        com nds_high
+        rjmp AND
+
+;----------------------------------------------------------------------
+; ????
+LEAF 10, "BITSTOGGLE"
+BITSTOGGLE:
+        com nds_low
+        com nds_high
+        rjmp AND
 
 ;----------------------------------------------------------------------
 ; ?? 0>
@@ -1100,7 +1208,7 @@ CELLS:
 
 ;----------------------------------------------------------------------
 ;
-; ok CELL is 2 bytes, add 2
+; ok add CELL_SZ
 ;
 LEAF 5, "CELL+"
 CELLPLUS:
@@ -1111,7 +1219,7 @@ CELLPLUS:
 
 ;----------------------------------------------------------------------
 ;
-; ok CELL is 2 bytes, sub 2
+; ok sub CELL_SZ
 ;
 LEAF 5, "CELL-"
 CELLMINUS:
@@ -1133,7 +1241,7 @@ CELLMINUS:
 ;	92FF C206 0ECD 9361 2823
 ;	BE0B B303 6462 0E4C 3D24
 ;
-LEAF 3, "RND"
+LEAF 3, "_RND_"
 RND:
 ;	load seed
 		lds wrk_low, _RANDW
@@ -1296,6 +1404,26 @@ _CORE:
 ; end trampoline
 ;
 ;----------------------------------------------------------------------
+
+;----------------------------------------------------------------------
+; ????
+LEAF 3, "D2/"
+DSHR:
+        lsr nds_low
+        ror nds_high
+        ror tos_low
+        ror tos_high
+        rjmp CORE
+
+;----------------------------------------------------------------------
+; ????
+LEAF 3, "D2*"
+DSHL:
+        lsl nds_low
+        rol nds_high
+        rol tos_low
+        rol tos_high
+        rjmp CORE
 
 ;----------------------------------------------------------------------
 ;
@@ -1593,65 +1721,3 @@ _bcd4:  dec     r17
 
 ;----------------------------------------------------------------------
 
-/*
- *  DISCLAIMER:
- *
- *  Copyright © 2020, Alvaro Barcellos,
- *  Permission is hereby granted, free of charge, to any person obtaining
- *  a copy of this software and associated documentation files (the
- *  "Software"), to deal in the Software without restriction, including
- *  without limitation the rights to use, copy, modify, merge, publish,
- *  distribute, sublicense, and/or sell copies of the Software, and to
- *  permit persons to whom the Software is furnished to do so, subject to
- *  the following conditions:
- *
- *  The above copyright notice and this permission notice shall be
- *  included in all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- *  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- *  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- *  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- *  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- *  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- *  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
-*/
-
-/* get some magic constants */
-
-#include <avr/io.h>
-
-/*
-just dont compile by sdt
-#include <avr/eeprom.h>
-#include <avr/wdt.h>
-*/
-
-;----------------------------------------------------------------------
-;
-; 02/12/2020
-;
-; Alvaro Gomes Sobral Barcellos
-;
-; u2forth
-;
-
-/*
-
-  inspired on eforth from books and papers from C. H. Ting
- 
-  just experience for small microcontrolers
- 
-  emulates a virtual uCi, really, really, just using SEG and PC, ((0x3D) + 0x20) is reserved for interrups (future)
- 
-
-;----------------------------------------------------------------------
-
-12/01/2021
-	documentation in howto.inc 
-	internal interpreter core, branch, qbranch, enter, exit	rewrited
-	optimized core for 0, 1, 2, 3, and other opcodes in trampoline
-
-08/01/2021	
-	rewrote for all primitive ends with EXIT not CORE
