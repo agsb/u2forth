@@ -1,6 +1,12 @@
 b32b6114-2abc-11eb-8261-1be5f55f2874 Thu, 19 Nov 2020 20:12:31 -0300
 # https://github.com/agsb/u2forth.git
 
+# PLEASE LOOK FOR F2U 
+
+_this file is outdated and is a stub, please look for f2u_
+
+This is my first attempt to describe and understand Forth form inside
+
 ## u2forth
 
   A forth virtual machine, still in C language, more one.
