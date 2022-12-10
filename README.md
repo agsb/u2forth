@@ -3,7 +3,7 @@ b32b6114-2abc-11eb-8261-1be5f55f2874 Thu, 19 Nov 2020 20:12:31 -0300
 
 # PLEASE LOOK FOR F2U 
 
-_this file is outdated and is a stub, please look for f2u_
+_this file is outdated and is a stub, please look for [f2u](https://github.com/agsb/f2u)_
 
 This is my first attempt to describe and understand Forth form inside
 
